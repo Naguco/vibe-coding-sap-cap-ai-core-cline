@@ -1,0 +1,8 @@
+ID;name;description;parentCategory_ID
+550e8400-e29b-41d4-a716-446655441001;Fiction;Fictional literature and novels;
+550e8400-e29b-41d4-a716-446655441002;Science Fiction;Science fiction and fantasy literature;550e8400-e29b-41d4-a716-446655441001
+550e8400-e29b-41d4-a716-446655441003;Mystery;Mystery and detective novels;550e8400-e29b-41d4-a716-446655441001
+550e8400-e29b-41d4-a716-446655441004;Horror;Horror and thriller novels;550e8400-e29b-41d4-a716-446655441001
+550e8400-e29b-41d4-a716-446655441005;Fantasy;Fantasy and magical realism;550e8400-e29b-41d4-a716-446655441001
+550e8400-e29b-41d4-a716-446655441006;Non-Fiction;Non-fictional books and documentaries;
+550e8400-e29b-41d4-a716-446655441007;Children;Books for children and young adults;
