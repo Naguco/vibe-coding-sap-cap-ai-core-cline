@@ -30,3 +30,5 @@ Please, generate the memory bank, so we can start with the project.
     - Consider the CAP documentation before moving one with the new enhancement.
     - Apply a TDD approach. There are tests already done in this project. Maybe it will be great to modify them and include more tests FIRSTLY. I want a RED-GREEN-REFACTOR approach.
     - Let's discuss also about the new enhancement.
+
+7. It seems that there is a bug in the code. The administrator explained that when they create a book, it is possible to create it with a negative amount. It seems that this is not happening when updating the book. Could you please check it? If you see a bug, please, perform solving this task in a TDD way. Red, green way. Firstly the test, check that it does not pass, then the bug fixing.
