@@ -42,7 +42,6 @@
     "app/*"
   ],
   "sapux": [
-    "app/bookstore-app-ai-ui",
     "app/customer-shopping-ui"
   ]
 }
