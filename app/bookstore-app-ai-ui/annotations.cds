@@ -1,4 +1,9 @@
 using CustomerService as service from '../../srv/customer-service';
+
+// Temporarily commented out to avoid conflicts with customer-shopping-ui
+// This will be restored once we have separate service endpoints
+
+/*
 annotate service.Books with @(
     UI.FieldGroup #GeneratedGroup : {
         $Type : 'UI.FieldGroupType',
@@ -121,4 +126,4 @@ annotate service.Books with {
         ],
     }
 };
-
+*/

@@ -16,7 +16,8 @@
     "start": "cds-serve",
     "test": "jest --silent",
     "test:watch": "jest --watch",
-    "watch-bookstore-app-ai-ui": "cds watch --open bookstoreappaiui/index.html?sap-ui-xx-viewCache=false --livereload false"
+    "watch-bookstore-app-ai-ui": "cds watch --open bookstoreappaiui/index.html?sap-ui-xx-viewCache=false --livereload false",
+    "watch-customer-shopping-ui": "cds watch --open customershoppingui/index.html?sap-ui-xx-viewCache=false --livereload false"
   },
   "jest": {
     "testEnvironment": "node",
@@ -41,6 +42,7 @@
     "app/*"
   ],
   "sapux": [
-    "app/bookstore-app-ai-ui"
+    "app/bookstore-app-ai-ui",
+    "app/customer-shopping-ui"
   ]
 }

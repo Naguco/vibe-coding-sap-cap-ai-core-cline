@@ -1,0 +1,29 @@
+{
+  "generationParameters": {
+    "generationDate": "Mon Oct 20 2025 10:40:31 GMT+0200 (Central European Summer Time)",
+    "generatorPlatform": "CLI",
+    "serviceType": "Local CAP",
+    "metadataFilename": "",
+    "serviceUrl": "http://localhost:4004/odata/v4/customer/",
+    "appName": "customer-shopping-ui",
+    "appTitle": "Customer Book Store",
+    "appDescription": "Customer shopping interface for browsing and purchasing books",
+    "appNamespace": "",
+    "ui5Theme": "sap_horizon",
+    "ui5Version": "1.141.1",
+    "enableCodeAssist": false,
+    "enableEslint": false,
+    "enableTypeScript": false,
+    "showMockDataInfo": false,
+    "generatorVersion": "1.19.1",
+    "template": "List Report Page V4",
+    "generatorName": "SAP Fiori Application Generator",
+    "entityRelatedConfig": [
+      {
+        "type": "Main Entity",
+        "value": "Books"
+      }
+    ],
+    "launchText": "To launch the generated app, start your CAP project:  and navigate to the following location in your browser:\n\nhttp://localhost:4004/customer-shopping-ui/webapp/index.html"
+  }
+}
