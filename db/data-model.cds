@@ -189,7 +189,7 @@ view BooksWithStock as select from Books {
 } where stock >= 0;
 
 view OrderSummary as select from Orders {
-  ID,
+  key ID,
   orderNumber,
   orderDate,
   status,
@@ -198,7 +198,7 @@ view OrderSummary as select from Orders {
 } group by ID, orderNumber, orderDate, status, totalAmount;
 
 view PopularBooks as select from OrderItems {
-  book.ID,
+  key book.ID,
   book.title,
   book.author.name as authorName,
   sum(quantity) as totalSold : Integer,
