@@ -7,7 +7,17 @@ service CustomerService {
         *,
         author: redirected to Authors,
         categories: redirected to BookCategories
-    } excluding { createdAt, createdBy, modifiedAt, modifiedBy };
+    } excluding { createdAt, createdBy, modifiedAt, modifiedBy }
+    actions {
+        action addToCart(
+            quantity: Integer
+        ) returns {
+            success: Boolean;
+            message: String;
+            cartItemCount: Integer;
+            cartTotal: Decimal(10,2);
+        };
+    };
     
     @readonly entity Authors as projection on bookstore.Authors {
         *,
@@ -47,6 +57,22 @@ service CustomerService {
         *,
         order: redirected to MyOrders,
         book: redirected to Books
+    };
+    
+    // Shopping Cart entities - filtered by user context with virtual calculated fields
+    entity MyShoppingCart as projection on bookstore.ShoppingCarts {
+        *,
+        items: redirected to MyShoppingCartItems,
+        virtual totalItems: Integer,
+        virtual totalAmount: Decimal(10,2)
+    };
+    
+    entity MyShoppingCartItems as projection on bookstore.ShoppingCartItems {
+        *,
+        cart: redirected to MyShoppingCart,
+        book: redirected to Books,
+        virtual subtotal: Decimal(10,2),
+        virtual unitPrice: Decimal(10,2)
     };
     
     // Customer-specific actions for business operations
@@ -102,6 +128,54 @@ service CustomerService {
         isValidDiscount: Boolean;
     };
     
+    
+    action updateCartItem(
+        itemId: UUID,
+        quantity: Integer
+    ) returns {
+        success: Boolean;
+        message: String;
+        cartItemCount: Integer;
+        cartTotal: Decimal(10,2);
+    };
+    
+    action removeFromCart(
+        itemId: UUID
+    ) returns {
+        success: Boolean;
+        message: String;
+        cartItemCount: Integer;
+        cartTotal: Decimal(10,2);
+    };
+    
+    action clearCart() returns {
+        success: Boolean;
+        message: String;
+    };
+    
+    action getCartSummary() returns {
+        items: array of {
+            itemId: UUID;
+            bookId: UUID;
+            bookTitle: String;
+            bookAuthor: String;
+            quantity: Integer;
+            unitPrice: Decimal(10,2);
+            subtotal: Decimal(10,2);
+        };
+        totalItems: Integer;
+        totalAmount: Decimal(10,2);
+    };
+    
+    // Enhanced purchase action to work with cart
+    action purchaseFromCart(
+        discountCode: String,
+        shippingAddress: String,
+        billingAddress: String,
+        customerEmail: String,
+        customerPhone: String
+    ) returns String;
+    
     // Customer utility functions
     function getRecommendations() returns array of Books;
     function getOrderHistory() returns array of MyOrders;
@@ -126,4 +200,12 @@ annotate CustomerService.MyReviews with @(restrict: [
 
 annotate CustomerService.MyReturns with @(restrict: [
     { grant: ['READ', 'CREATE'], to: 'customer', where: 'createdBy = $user' }
+]);
+
+annotate CustomerService.MyShoppingCart with @(restrict: [
+    { grant: ['READ', 'CREATE', 'UPDATE', 'DELETE'], to: 'customer', where: 'createdBy = $user' }
+]);
+
+annotate CustomerService.MyShoppingCartItems with @(restrict: [
+    { grant: ['READ', 'CREATE', 'UPDATE', 'DELETE'], to: 'customer', where: 'cart.createdBy = $user' }
 ]);

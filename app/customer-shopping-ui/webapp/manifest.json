@@ -92,6 +92,16 @@
           "pattern": "Books({key}):?query:",
           "name": "BooksObjectPage",
           "target": "BooksObjectPage"
+        },
+        {
+          "pattern": "MyShoppingCart:?query:",
+          "name": "MyShoppingCartList",
+          "target": "MyShoppingCartList"
+        },
+        {
+          "pattern": "MyShoppingCart({key}):?query:",
+          "name": "MyShoppingCartObjectPage",
+          "target": "MyShoppingCartObjectPage"
         }
       ],
       "targets": {
@@ -116,6 +126,18 @@
                     "type": "ResponsiveTable"
                   }
                 }
+              },
+              "content": {
+                "header": {
+                  "actions": {
+                    "viewCart": {
+                      "press": "customershoppingui.ext.ViewCartAction.onPress",
+                      "visible": true,
+                      "enabled": true,
+                      "text": "{i18n>viewCartButton}"
+                    }
+                  }
+                }
               }
             }
           }
@@ -128,6 +150,42 @@
             "settings": {
               "editableHeaderContent": false,
               "contextPath": "/Books"
+            }
+          }
+        },
+        "MyShoppingCartList": {
+          "type": "Component",
+          "id": "MyShoppingCartList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "contextPath": "/MyShoppingCart",
+              "variantManagement": "Page",
+              "navigation": {
+                "MyShoppingCart": {
+                  "detail": {
+                    "route": "MyShoppingCartObjectPage"
+                  }
+                }
+              },
+              "controlConfiguration": {
+                "@com.sap.vocabularies.UI.v1.LineItem": {
+                  "tableSettings": {
+                    "type": "ResponsiveTable"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "MyShoppingCartObjectPage": {
+          "type": "Component",
+          "id": "MyShoppingCartObjectPage",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": {
+            "settings": {
+              "editableHeaderContent": false,
+              "contextPath": "/MyShoppingCart"
             }
           }
         }

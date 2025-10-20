@@ -2,7 +2,7 @@ const cds = require('@sap/cds');
 
 module.exports = cds.service.impl(async function() {
     
-    const { Books, MyOrders, MyOrderItems, MyReviews, MyReturns } = this.entities;
+    const { Books, MyOrders, MyOrderItems, MyReviews, MyReturns, MyShoppingCart, MyShoppingCartItems } = this.entities;
 
     // Get the underlying database service to access DiscountCodes without exposing it to customers
     const db = await cds.connect.to('db');
@@ -501,7 +501,339 @@ module.exports = cds.service.impl(async function() {
         
         return hasPurchased.length > 0;
     });
-    
+
+    // SHOPPING CART ACTIONS
+
+    // Helper function to get or create user's active cart
+    const getOrCreateCart = async (user) => {
+        let cart = await SELECT.one.from(MyShoppingCart)
+            .where({ createdBy: user, status: 'ACTIVE' });
+        
+        if (!cart) {
+            const result = await INSERT.into(MyShoppingCart).entries({
+                status: 'ACTIVE',
+                createdBy: user
+            });
+            cart = await SELECT.one.from(MyShoppingCart)
+            .where({ createdBy: user, status: 'ACTIVE' });
+        }
+        
+        return cart;
+    };
+
+    // Helper function to calculate cart totals
+    const calculateCartTotals = async (cartId) => {
+        const cartItems = await SELECT.from(MyShoppingCartItems)
+            .columns('quantity', 'book_ID')
+            .where({ cart_ID: cartId });
+        
+        let totalItems = 0;
+        let totalAmount = 0;
+        
+        for (const item of cartItems) {
+            const book = await SELECT.one.from(Books).where({ ID: item.book_ID });
+            if (book) {
+                totalItems += item.quantity;
+                totalAmount += book.price * item.quantity;
+            }
+        }
+        
+        return {
+            cartItemCount: totalItems,
+            cartTotal: Math.round(totalAmount * 100) / 100
+        };
+    };
+
+    // Action: Add to Cart (bound to Books entity)
+    this.on('addToCart', 'Books', async (req) => {
+        const { quantity } = req.data;
+        const bookId = req.params[0].ID; // The book ID comes from the entity context
+        const user = req.user.id;
+        
+        // Validate input
+        if (!bookId || !quantity) {
+            req.error(400, 'Book ID and quantity are required');
+            return;
+        }
+        
+        if (quantity < 1 || quantity > 99) {
+            req.error(400, 'Quantity must be between 1 and 99');
+            return;
+        }
+        
+        // Check if book exists and has sufficient stock
+        const book = await SELECT.one.from(Books).where({ ID: bookId });
+        if (!book) {
+            req.error(404, `Book with ID ${bookId} not found`);
+            return;
+        }
+        
+        if (book.stock < quantity) {
+            req.error(400, `Insufficient stock for book "${book.title}". Available: ${book.stock}, Requested: ${quantity}`);
+            return;
+        }
+        
+        // Get or create user's cart
+        const cart = await getOrCreateCart(user);
+        
+        // Check if book is already in cart
+        const existingItem = await SELECT.one.from(MyShoppingCartItems)
+            .where({ cart_ID: cart.ID, book_ID: bookId });
+        
+        let message;
+        
+        if (existingItem) {
+            // Update existing item quantity
+            const newQuantity = existingItem.quantity + quantity;
+            
+            if (newQuantity > book.stock) {
+                req.error(400, `Cannot add ${quantity} more. Total would exceed available stock of ${book.stock}`);
+                return;
+            }
+            
+            if (newQuantity > 99) {
+                req.error(400, 'Maximum quantity per item is 99');
+                return;
+            }
+            
+            await UPDATE(MyShoppingCartItems)
+                .where({ ID: existingItem.ID })
+                .with({ quantity: newQuantity });
+            
+            message = `Cart updated - "${book.title}" quantity increased to ${newQuantity}`;
+        } else {
+            // Add new item to cart
+            await INSERT.into(MyShoppingCartItems).entries({
+                cart_ID: cart.ID,
+                book_ID: book.ID,
+                quantity,
+                createdBy: user
+            });
+            
+            message = 'Book added to cart successfully';
+        }
+        
+        // Calculate cart totals
+        const totals = await calculateCartTotals(cart.ID);
+        
+        return {
+            success: true,
+            message,
+            cartItemCount: totals.cartItemCount,
+            cartTotal: totals.cartTotal
+        };
+    });
+
+    // Action: Update Cart Item
+    this.on('updateCartItem', async (req) => {
+        const { itemId, quantity } = req.data;
+        const user = req.user.id;
+        
+        // Validate input
+        if (!itemId || !quantity) {
+            req.error(400, 'Item ID and quantity are required');
+            return;
+        }
+        
+        if (quantity < 1 || quantity > 99) {
+            req.error(400, 'Quantity must be between 1 and 99');
+            return;
+        }
+        
+        // Find cart item and verify it belongs to user
+        const cartItem = await SELECT.one.from(MyShoppingCartItems)
+            .where({ ID: itemId, 'cart.createdBy': user });
+        
+        if (!cartItem) {
+            req.error(404, 'Cart item not found');
+            return;
+        }
+        
+        // Check book stock
+        const book = await SELECT.one.from(Books).where({ ID: cartItem.book_ID });
+        if (!book) {
+            req.error(404, 'Book not found');
+            return;
+        }
+        
+        if (book.stock < quantity) {
+            req.error(400, `Insufficient stock for book "${book.title}". Available: ${book.stock}, Requested: ${quantity}`);
+            return;
+        }
+        
+        // Update cart item
+        await UPDATE(MyShoppingCartItems)
+            .where({ ID: itemId })
+            .with({ quantity });
+        
+        // Calculate cart totals
+        const totals = await calculateCartTotals(cartItem.cart_ID);
+        
+        return {
+            success: true,
+            message: 'Cart item updated successfully',
+            cartItemCount: totals.cartItemCount,
+            cartTotal: totals.cartTotal
+        };
+    });
+
+    // Action: Remove from Cart
+    this.on('removeFromCart', async (req) => {
+        const { itemId } = req.data;
+        const user = req.user.id;
+        
+        // Validate input
+        if (!itemId) {
+            req.error(400, 'Item ID is required');
+            return;
+        }
+        
+        // Find cart item and verify it belongs to user
+        const cartItem = await SELECT.one.from(MyShoppingCartItems)
+            .where({ ID: itemId, 'cart.createdBy': user });
+        
+        if (!cartItem) {
+            req.error(404, 'Cart item not found');
+            return;
+        }
+        
+        // Remove cart item
+        await DELETE.from(MyShoppingCartItems).where({ ID: itemId });
+        
+        // Calculate cart totals
+        const totals = await calculateCartTotals(cartItem.cart_ID);
+        
+        return {
+            success: true,
+            message: 'Item removed from cart successfully',
+            cartItemCount: totals.cartItemCount,
+            cartTotal: totals.cartTotal
+        };
+    });
+
+    // Action: Clear Cart
+    this.on('clearCart', async (req) => {
+        const user = req.user.id;
+        
+        // Find user's active cart
+        const cart = await SELECT.one.from(MyShoppingCart)
+            .where({ createdBy: user, status: 'ACTIVE' });
+        
+        if (cart) {
+            // Delete all cart items
+            await DELETE.from(MyShoppingCartItems).where({ cart_ID: cart.ID });
+        }
+        
+        return {
+            success: true,
+            message: 'Cart cleared successfully'
+        };
+    });
+
+    // Action: Get Cart Summary
+    this.on('getCartSummary', async (req) => {
+        const user = req.user.id;
+        
+        // Find user's active cart
+        const cart = await SELECT.one.from(MyShoppingCart)
+            .where({ createdBy: user, status: 'ACTIVE' });
+        
+        if (!cart) {
+            return {
+                items: [],
+                totalItems: 0,
+                totalAmount: 0
+            };
+        }
+        
+        // Get cart items with book details
+        const cartItems = await SELECT.from(MyShoppingCartItems)
+            .columns('ID', 'quantity', 'book_ID', 'book.title', 'book.author.name as authorName', 'book.price')
+            .where({ cart_ID: cart.ID });
+        
+        let totalItems = 0;
+        let totalAmount = 0;
+        
+        const items = cartItems.map(item => {
+            const subtotal = item.book_price * item.quantity;
+            totalItems += item.quantity;
+            totalAmount += subtotal;
+            
+            return {
+                itemId: item.ID,
+                bookId: item.book_ID,
+                bookTitle: item.book_title,
+                bookAuthor: item.authorName,
+                quantity: item.quantity,
+                unitPrice: item.book_price,
+                subtotal: Math.round(subtotal * 100) / 100
+            };
+        });
+        
+        return {
+            items,
+            totalItems,
+            totalAmount: Math.round(totalAmount * 100) / 100
+        };
+    });
+
+    // Action: Purchase from Cart
+    this.on('purchaseFromCart', async (req) => {
+        const { discountCode, shippingAddress, billingAddress, customerEmail, customerPhone } = req.data;
+        const user = req.user.id;
+        
+        // Validate required fields
+        if (!shippingAddress || !billingAddress || !customerEmail || !customerPhone) {
+            req.error(400, 'Shipping address, billing address, customer email, and customer phone are required');
+            return;
+        }
+        
+        // Find user's active cart
+        const cart = await SELECT.one.from(MyShoppingCart)
+            .where({ createdBy: user, status: 'ACTIVE' });
+        
+        if (!cart) {
+            req.error(400, 'No active cart found');
+            return;
+        }
+        
+        // Get cart items
+        const cartItems = await SELECT.from(MyShoppingCartItems)
+            .columns('quantity', 'book_ID')
+            .where({ cart_ID: cart.ID });
+        
+        if (cartItems.length === 0) {
+            req.error(400, 'Cart is empty');
+            return;
+        }
+        
+        // Convert cart items to purchase format
+        const purchaseItems = cartItems.map(item => ({
+            bookId: item.book_ID,
+            quantity: item.quantity
+        }));
+        
+        // Use existing purchaseBooks logic
+        const orderResult = await this.send('purchaseBooks', {
+            items: purchaseItems,
+            discountCode,
+            shippingAddress,
+            billingAddress,
+            customerEmail,
+            customerPhone
+        });
+        
+        // Clear cart after successful purchase
+        await DELETE.from(MyShoppingCartItems).where({ cart_ID: cart.ID });
+        
+        // Mark cart as converted
+        await UPDATE(MyShoppingCart)
+            .where({ ID: cart.ID })
+            .with({ status: 'CONVERTED' });
+        
+        return orderResult.replace('created successfully', 'created successfully from cart');
+    });
+
     // Entity-level handlers for user context filtering
     this.before('READ', 'MyOrders', (req) => {
         req.query.where({ createdBy: req.user.id });
@@ -527,6 +859,54 @@ module.exports = cds.service.impl(async function() {
     
     this.before('READ', 'MyReturns', (req) => {
         req.query.where({ createdBy: req.user.id });
+    });
+
+    // Shopping cart entity handlers
+    this.before('READ', 'MyShoppingCart', (req) => {
+        req.query.where({ createdBy: req.user.id, status: 'ACTIVE' });
+    });
+
+    this.before('READ', 'MyShoppingCartItems', async (req) => {
+        // Filter cart items by user's carts
+        const userCarts = await SELECT.from(MyShoppingCart)
+            .columns('ID')
+            .where({ createdBy: req.user.id });
+        
+        const cartIds = userCarts.map(cart => cart.ID);
+        if (cartIds.length > 0) {
+            req.query.where({ cart_ID: { in: cartIds } });
+        } else {
+            req.query.where({ cart_ID: null }); // No results if user has no carts
+        }
+    });
+
+    // Virtual field calculations for shopping cart
+    this.after('READ', 'MyShoppingCart', async (results, req) => {
+        if (!Array.isArray(results)) {
+            results = [results];
+        }
+
+        for (const cart of results) {
+            if (cart) {
+                const totals = await calculateCartTotals(cart.ID);
+                cart.totalItems = totals.cartItemCount;
+                cart.totalAmount = totals.cartTotal;
+            }
+        }
+    });
+
+    // Virtual field calculations for shopping cart items
+    this.after('READ', 'MyShoppingCartItems', async (results, req) => {
+        if (!Array.isArray(results)) {
+            results = [results];
+        }
+
+        for (const item of results) {
+            if (item && item.book) {
+                item.unitPrice = item.book.price;
+                item.subtotal = Math.round(item.book.price * item.quantity * 100) / 100;
+            }
+        }
     });
     
     // Prevent direct creation/update of transactional entities (use actions instead)

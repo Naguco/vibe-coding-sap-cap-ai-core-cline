@@ -177,6 +177,27 @@ entity DiscountCodes : managed {
 }
 
 //
+// Shopping Cart System Entities
+//
+
+entity ShoppingCarts : managed {
+  key ID            : UUID;
+  status            : String(20) default 'ACTIVE'; // ACTIVE, ABANDONED, CONVERTED
+  
+  // User context handled via managed aspect (createdBy = $user)
+  // Each user can only have one active cart
+  
+  // Associations
+  items             : Composition of many ShoppingCartItems on items.cart = $self;
+}
+
+entity ShoppingCartItems : cuid, managed {
+  cart              : Association to ShoppingCarts not null;
+  book              : Association to Books not null;
+  quantity          : Integer not null @assert.range: [1, 99];
+}
+
+//
 // Views for Analytics and Reporting
 //
 

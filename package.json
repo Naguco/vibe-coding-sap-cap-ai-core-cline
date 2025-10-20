@@ -33,6 +33,11 @@
             "roles": [
               "customer"
             ]
+          },
+          "customer2": {
+            "roles": [
+              "customer"
+            ]
           }
         }
       }

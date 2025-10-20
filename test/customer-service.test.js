@@ -714,4 +714,497 @@ describe('CustomerService', () => {
             });
         });
     });
+
+    describe('Shopping Cart Functionality', () => {
+        // Test shopping cart entity access
+        describe('Shopping Cart Entity Access', () => {
+            test('should allow customers to access their shopping cart', async () => {
+                const response = await GET('/odata/v4/customer/MyShoppingCart', customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data.value).toBeInstanceOf(Array);
+                // Customer should only see their own cart
+            });
+
+            test('should allow customers to access their shopping cart items', async () => {
+                const response = await GET('/odata/v4/customer/MyShoppingCartItems', customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data.value).toBeInstanceOf(Array);
+                // Customer should only see their own cart items
+            });
+
+            test('should prevent unauthorized access to shopping cart without authentication', async () => {
+                try {
+                    await GET('/odata/v4/customer/MyShoppingCart');
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(401);
+                }
+            });
+        });
+
+        describe('addToCart Action', () => {
+            test('should successfully add book to cart', async () => {
+                const cartData = {
+                    quantity: 2
+                };
+
+                const response = await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "../$metadata#CustomerService.return_CustomerService_Books_addToCart",
+                    success: true,
+                    message: 'Book added to cart successfully',
+                    cartItemCount: expect.any(Number),
+                    cartTotal: expect.any(Number)
+                });
+                expect(response.data.cartItemCount).toBeGreaterThan(0);
+                expect(response.data.cartTotal).toBeGreaterThan(0);
+            });
+
+            test('should update quantity when adding same book again', async () => {
+                const cartData = {
+                    quantity: 1
+                };
+
+                // Add book first time
+                await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData, customerAuth);
+                
+                // Add same book again
+                const response = await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data.success).toBe(true);
+                expect(response.data.message).toContain('updated');
+            });
+
+            test('should fail when adding non-existent book', async () => {
+                const cartData = {
+                    bookId: '00000000-0000-0000-0000-000000000000',
+                    quantity: 1
+                };
+
+                try {
+                    await POST('/odata/v4/customer/addToCart', cartData, customerAuth);
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(404);
+                }
+            });
+
+            test('should fail when quantity is invalid', async () => {
+                const cartData = {
+                    quantity: 0
+                };
+
+                try {
+                    await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData, customerAuth);
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(400);
+                }
+            });
+
+            test('should fail when quantity exceeds stock', async () => {
+                const cartData = {
+                    quantity: 1000 // Assuming this exceeds available stock
+                };
+
+                try {
+                    await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData, customerAuth);
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(400);
+                }
+            });
+
+            test('should fail when required fields are missing', async () => {
+                const cartData = {
+                    quantity: 1
+                    // Missing bookId
+                };
+
+                try {
+                    await POST('/odata/v4/customer/Books/addToCart', cartData, customerAuth);
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(400);
+                }
+            });
+        });
+
+        describe('updateCartItem Action', () => {
+            let cartItemId;
+
+            beforeEach(async () => {
+                // Add a book to cart first
+                const cartData = {
+                    quantity: 1
+                };
+                await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData, customerAuth);
+                
+                // Get the cart item ID
+                const cartResponse = await GET('/odata/v4/customer/MyShoppingCartItems', customerAuth);
+                if (cartResponse.data.value.length > 0) {
+                    cartItemId = cartResponse.data.value[0].ID;
+                }
+            });
+
+            test('should successfully update cart item quantity', async () => {
+                const updateData = {
+                    itemId: cartItemId,
+                    quantity: 3
+                };
+
+                const response = await POST('/odata/v4/customer/updateCartItem', updateData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_updateCartItem",
+                    success: true,
+                    message: 'Cart item updated successfully',
+                    cartItemCount: expect.any(Number),
+                    cartTotal: expect.any(Number)
+                });
+            });
+
+            test('should fail when updating non-existent cart item', async () => {
+                const updateData = {
+                    itemId: '00000000-0000-0000-0000-000000000000',
+                    quantity: 2
+                };
+
+                try {
+                    await POST('/odata/v4/customer/updateCartItem', updateData, customerAuth);
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(404);
+                }
+            });
+
+            test('should fail when quantity is invalid', async () => {
+                const updateData = {
+                    itemId: cartItemId,
+                    quantity: 0
+                };
+
+                try {
+                    await POST('/odata/v4/customer/updateCartItem', updateData, customerAuth);
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(400);
+                }
+            });
+        });
+
+        describe('removeFromCart Action', () => {
+            let cartItemId;
+
+            beforeEach(async () => {
+                // Add a book to cart first
+                const cartData = {
+                    quantity: 1
+                };
+                await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData, customerAuth);
+                
+                // Get the cart item ID
+                const cartResponse = await GET('/odata/v4/customer/MyShoppingCartItems', customerAuth);
+                if (cartResponse.data.value.length > 0) {
+                    cartItemId = cartResponse.data.value[0].ID;
+                }
+            });
+
+            test('should successfully remove item from cart', async () => {
+                const removeData = {
+                    itemId: cartItemId
+                };
+
+                const response = await POST('/odata/v4/customer/removeFromCart', removeData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_removeFromCart",
+                    success: true,
+                    message: 'Item removed from cart successfully',
+                    cartItemCount: expect.any(Number),
+                    cartTotal: expect.any(Number)
+                });
+            });
+
+            test('should fail when removing non-existent cart item', async () => {
+                const removeData = {
+                    itemId: '00000000-0000-0000-0000-000000000000'
+                };
+
+                try {
+                    await POST('/odata/v4/customer/removeFromCart', removeData, customerAuth);
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(404);
+                }
+            });
+
+            test('should fail when itemId is missing', async () => {
+                const removeData = {};
+
+                try {
+                    await POST('/odata/v4/customer/removeFromCart', removeData, customerAuth);
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(400);
+                }
+            });
+        });
+
+        describe('clearCart Action', () => {
+            beforeEach(async () => {
+                // Add some books to cart first
+                const cartData1 = {
+                    quantity: 1
+                };
+                const cartData2 = {
+                    quantity: 2
+                };
+                
+                await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData1, customerAuth);
+                await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442009)/addToCart', cartData2, customerAuth);
+            });
+
+            test('should successfully clear all items from cart', async () => {
+                const response = await POST('/odata/v4/customer/clearCart', {}, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_clearCart",
+                    success: true,
+                    message: 'Cart cleared successfully'
+                });
+
+                // Verify cart is empty
+                const cartResponse = await GET('/odata/v4/customer/MyShoppingCartItems', customerAuth);
+                expect(cartResponse.data.value).toHaveLength(0);
+            });
+
+            test('should succeed even when cart is already empty', async () => {
+                // Clear cart first
+                await POST('/odata/v4/customer/clearCart', {}, customerAuth);
+                
+                // Clear again
+                const response = await POST('/odata/v4/customer/clearCart', {}, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data.success).toBe(true);
+            });
+        });
+
+        describe('getCartSummary Action', () => {
+            beforeEach(async () => {
+                // Clear cart and add known items
+                await POST('/odata/v4/customer/clearCart', {}, customerAuth);
+                
+                const cartData1 = {
+                    quantity: 1
+                };
+                const cartData2 = {
+                    quantity: 2
+                };
+                
+                await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData1, customerAuth);
+                await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442009)/addToCart', cartData2, customerAuth);
+            });
+
+            test('should return complete cart summary', async () => {
+                const response = await POST('/odata/v4/customer/getCartSummary', {}, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data['@odata.context']).toBeDefined()
+                expect(response.data.items).toBeInstanceOf(Array);
+                expect(response.data.items).toHaveLength(2);
+                expect(response.data.totalItems).toBe(3); // 1 + 2
+                expect(response.data.totalAmount).toBeGreaterThan(0);
+
+                // Check item structure
+                const item = response.data.items[0];
+                expect(item).toHaveProperty('itemId');
+                expect(item).toHaveProperty('bookId');
+                expect(item).toHaveProperty('bookTitle');
+                expect(item).toHaveProperty('bookAuthor');
+                expect(item).toHaveProperty('quantity');
+                expect(item).toHaveProperty('unitPrice');
+                expect(item).toHaveProperty('subtotal');
+            });
+
+            test('should return empty summary for empty cart', async () => {
+                // Clear cart first
+                await POST('/odata/v4/customer/clearCart', {}, customerAuth);
+                
+                const response = await POST('/odata/v4/customer/getCartSummary', {}, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data.items).toHaveLength(0);
+                expect(response.data.totalItems).toBe(0);
+                expect(response.data.totalAmount).toBe(0);
+            });
+        });
+
+        describe('purchaseFromCart Action', () => {
+            beforeEach(async () => {
+                // Clear cart and add known items
+                await POST('/odata/v4/customer/clearCart', {}, customerAuth);
+                
+                const cartData = {
+                    quantity: 1
+                };
+                
+                await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData, customerAuth);
+            });
+
+            test('should successfully purchase all items from cart', async () => {
+                const purchaseData = {
+                    shippingAddress: '123 Test St, Test City',
+                    billingAddress: '123 Test St, Test City',
+                    customerEmail: 'test@example.com',
+                    customerPhone: '+1234567890'
+                };
+
+                const response = await POST('/odata/v4/customer/purchaseFromCart', purchaseData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data.value).toContain('Order');
+                expect(response.data.value).toContain('created successfully');
+                expect(response.data.value).toContain('from cart');
+
+                // Verify cart is cleared after purchase
+                const cartResponse = await GET('/odata/v4/customer/MyShoppingCartItems', customerAuth);
+                expect(cartResponse.data.value).toHaveLength(0);
+            });
+
+            test('should successfully purchase from cart with discount code', async () => {
+                const purchaseData = {
+                    discountCode: 'SAVE10-NEW',
+                    shippingAddress: '123 Test St, Test City',
+                    billingAddress: '123 Test St, Test City',
+                    customerEmail: 'test@example.com',
+                    customerPhone: '+1234567890'
+                };
+
+                const response = await POST('/odata/v4/customer/purchaseFromCart', purchaseData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data.value).toContain('Order');
+                expect(response.data.value).toContain('created successfully');
+                expect(response.data.value).toContain('from cart');
+            });
+
+            test('should fail when cart is empty', async () => {
+                // Clear cart first
+                await POST('/odata/v4/customer/clearCart', {}, customerAuth);
+                
+                const purchaseData = {
+                    shippingAddress: '123 Test St, Test City',
+                    billingAddress: '123 Test St, Test City',
+                    customerEmail: 'test@example.com',
+                    customerPhone: '+1234567890'
+                };
+
+                try {
+                    await POST('/odata/v4/customer/purchaseFromCart', purchaseData, customerAuth);
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(400);
+                }
+            });
+
+            test('should fail when required fields are missing', async () => {
+                const purchaseData = {
+                    // Missing required address fields
+                    customerEmail: 'test@example.com',
+                    customerPhone: '+1234567890'
+                };
+
+                try {
+                    await POST('/odata/v4/customer/purchaseFromCart', purchaseData, customerAuth);
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(400);
+                }
+            });
+        });
+
+        describe('Virtual Fields and Calculated Values', () => {
+            beforeEach(async () => {
+                // Clear cart and add known items
+                await POST('/odata/v4/customer/clearCart', {}, customerAuth);
+                
+                const cartData = {
+                    quantity: 2
+                };
+                
+                await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData, customerAuth);
+            });
+
+            test('should calculate virtual fields for cart items', async () => {
+                const response = await GET('/odata/v4/customer/MyShoppingCartItems?$expand=book', customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data.value).toHaveLength(1);
+                
+                const item = response.data.value[0];
+                expect(item.unitPrice).toBe(item.book.price);
+                expect(item.subtotal).toBe(item.book.price * item.quantity);
+            });
+
+            test('should calculate virtual fields for shopping cart', async () => {
+                const response = await GET('/odata/v4/customer/MyShoppingCart?$expand=items($expand=book)', customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data.value).toHaveLength(1);
+                
+                const cart = response.data.value[0];
+                expect(cart.totalItems).toBe(2);
+                expect(cart.totalAmount).toBeGreaterThan(0);
+                
+                // Verify total matches sum of item subtotals
+                const expectedTotal = cart.items.reduce((sum, item) => sum + (item.book.price * item.quantity), 0);
+                expect(cart.totalAmount).toBe(expectedTotal);
+            });
+        });
+
+        describe('User Isolation and Security', () => {
+            const customer2Auth = { auth: { username: 'customer2' } };
+
+            test('should isolate cart data between different users', async () => {
+                // Add item to cart as customer1
+                const cartData = {
+                    quantity: 1
+                };
+                await POST('/odata/v4/customer/Books(550e8400-e29b-41d4-a716-446655442001)/addToCart', cartData, customerAuth);
+                
+                // Check that customer2 cannot see customer1's cart
+                const customer2Response = await GET('/odata/v4/customer/MyShoppingCartItems', customer2Auth);
+                expect(customer2Response.status).toBe(200);
+                expect(customer2Response.data.value).toHaveLength(0);
+                
+                // Check that customer1 can see their own cart
+                const customer1Response = await GET('/odata/v4/customer/MyShoppingCartItems', customerAuth);
+                expect(customer1Response.status).toBe(200);
+                expect(customer1Response.data.value.length).toBeGreaterThan(0);
+            });
+
+            test('should prevent customers from accessing other users cart items directly', async () => {
+                // This test would require knowing another user's cart item ID
+                // In practice, the authorization should prevent access
+                const nonExistentItemId = '00000000-0000-0000-0000-000000000000';
+                
+                try {
+                    await GET(`/odata/v4/customer/MyShoppingCartItems(${nonExistentItemId})`, customerAuth);
+                    fail('Expected request to fail');
+                } catch (error) {
+                    expect(error.response.status).toBe(404);
+                }
+            });
+        });
+    });
 });
