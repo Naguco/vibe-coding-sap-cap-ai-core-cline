@@ -19,34 +19,36 @@
 - **Breaking Schema Changes**: Updated both AdminService and CustomerService order creation
 - **NOT NULL Constraints**: Ensured all order creation includes `originalAmount` and `discountAmount`
 
-## **IMMEDIATE NEXT STEPS (Customer Discount Application)**
+## **DISCOUNT FUNCTIONALITY - COMPLETED ✅**
 
-### Phase 3: Customer Discount Application (PENDING)
-The following functionality needs to be implemented for customers to use discount codes:
+### Phase 3: Customer Discount Application (COMPLETED)
+All discount functionality has been successfully implemented and tested:
 
-#### 3.1 **Core Business Functions** (High Priority)
+#### 3.1 **Core Business Functions** ✅ IMPLEMENTED
+- **validateDiscountCode Action**: Validates discount codes with comprehensive business logic
+  - Checks code existence, active status, date range, minimum order amount, usage limits
+  - Calculates discount amount for both percentage and fixed amount types
+  - Respects maximum discount caps for percentage discounts
+  
+- **calculateOrderTotal Action**: Calculates order totals with optional discount application
+  - Computes original amount from cart items
+  - Applies discount validation and calculation
+  - Returns complete order summary with discount breakdown
+
+#### 3.2 **Enhanced Purchase Books Action** ✅ IMPLEMENTED  
+- Updated `purchaseBooks` to accept optional `discountCode` parameter
+- Integrates with `validateDiscountCode` using proper CAP service communication (`this.send()`)
+- Updates discount usage counter after successful order creation
+- Links applied discount code ID to order record for referential integrity
+
+#### 3.3 **Service Communication Pattern** ✅ LEARNED & APPLIED
+**Critical Learning**: Internal action calls in CAP Node.js must use `this.send()`:
 ```javascript
-// In customer-service.js - these functions are MISSING:
+// ❌ INCORRECT (causes "Value [object Object] is not a valid String" error)
+const result = await this.validateDiscountCode({ data: { discountCode, orderTotal } });
 
-// Function: Calculate Order Total with Discount
-this.on('calculateOrderTotal', async (req) => {
-  // Input: { items: [...], discountCode?: string }
-  // Logic: 
-  //   1. Calculate original total from items
-  //   2. If discountCode provided, validate and apply discount
-  //   3. Return: { originalAmount, discountAmount, totalAmount, isValidDiscount }
-});
-
-// Function: Validate Discount Code
-this.on('validateDiscountCode', async (req) => {
-  // Input: { discountCode: string, orderTotal: number }
-  // Logic:
-  //   1. Check if code exists and is active
-  //   2. Validate date range (validFrom <= now <= validTo)
-  //   3. Check minimum order amount
-  //   4. Check usage limits
-  //   5. Return validation result with discount info
-});
+// ✅ CORRECT 
+const result = await this.send('validateDiscountCode', { discountCode, orderTotal });
 ```
 
 #### 3.2 **Enhanced Purchase Books Action** (High Priority)

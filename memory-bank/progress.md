@@ -35,12 +35,13 @@
 - [x] **Schema Migration Fixed**: Updated existing order creation to include new required fields
 - [x] **All Admin Tests Passing**: AdminService discount functionality fully tested and working
 
-### 🎯 Phase 5: Discount System - Customer Application (IN PROGRESS)
-- [ ] **Core Business Functions**: `calculateOrderTotal` and `validateDiscountCode` functions
-- [ ] **Enhanced Purchase Flow**: Update `purchaseBooks` to handle discount codes
-- [ ] **TDD Implementation**: Write failing tests first, then implement functionality
-- [ ] **Integration Testing**: Test complete discount workflow end-to-end
-- [ ] **Usage Tracking**: Implement discount usage counter updates
+### ✅ Phase 5: Discount System - Customer Application (COMPLETED)
+- [x] **Core Business Functions**: `calculateOrderTotal` and `validateDiscountCode` functions implemented
+- [x] **Enhanced Purchase Flow**: Updated `purchaseBooks` to handle discount codes
+- [x] **TDD Implementation**: Comprehensive test suite written and all tests passing
+- [x] **Integration Testing**: Complete discount workflow tested end-to-end
+- [x] **Usage Tracking**: Discount usage counter updates implemented
+- [x] **Service Communication**: Learned and applied proper CAP action calling with `this.send()`
 
 ### 🔄 Phase 6: UI Integration (READY TO START)
 - [ ] Fiori Elements application generation

@@ -3,10 +3,14 @@ const cds = require('@sap/cds');
 module.exports = cds.service.impl(async function() {
     
     const { Books, MyOrders, MyOrderItems, MyReviews, MyReturns } = this.entities;
+
+    // Get the underlying database service to access DiscountCodes without exposing it to customers
+    const db = await cds.connect.to('db');
+    const { DiscountCodes } = db.entities('bookstore');
     
     // Action: Purchase Books
     this.on('purchaseBooks', async (req) => {
-        const { items, shippingAddress, billingAddress, customerEmail, customerPhone } = req.data;
+        const { items, discountCode, shippingAddress, billingAddress, customerEmail, customerPhone } = req.data;
         const user = req.user.id;
         
         if (!items || items.length === 0) {
@@ -14,10 +18,10 @@ module.exports = cds.service.impl(async function() {
             return;
         }
         
-        let totalAmount = 0;
+        let originalAmount = 0;
         const orderItems = [];
         
-        // Validate items and calculate total
+        // Validate items and calculate original total
         for (const item of items) {
             const book = await SELECT.one.from(Books).where({ ID: item.bookId });
             if (!book) {
@@ -31,7 +35,7 @@ module.exports = cds.service.impl(async function() {
             }
             
             const itemTotal = book.price * item.quantity;
-            totalAmount += itemTotal;
+            originalAmount += itemTotal;
             
             orderItems.push({
                 book_ID: item.bookId,
@@ -39,6 +43,37 @@ module.exports = cds.service.impl(async function() {
                 unitPrice: book.price,
                 totalPrice: itemTotal
             });
+        }
+        
+        // Round original amount to 2 decimal places
+        originalAmount = Math.round(originalAmount * 100) / 100;
+        
+        // Apply discount if provided
+        let discountAmount = 0;
+        let finalAmount = originalAmount;
+        let appliedDiscountCode = null;
+        let discountMessage = '';
+        let discountCodeId = null;
+        
+        if (discountCode) {
+            const discountValidation = await this.send('validateDiscountCode', {
+                discountCode, 
+                orderTotal: originalAmount
+            });
+            
+            if (discountValidation.isValid) {
+                discountAmount = discountValidation.discountAmount;
+                finalAmount = discountValidation.finalAmount;
+                appliedDiscountCode = discountCode;
+                discountMessage = ` with ${discountCode} discount applied (saved $${discountAmount.toFixed(2)})`;
+                
+                // Update discount usage counter
+                await UPDATE(DiscountCodes)
+                    .where({ code: discountCode })
+                    .with({ usedCount: { '+=': 1 } });
+
+                discountCodeId = await SELECT.one.from(DiscountCodes).where({ code: discountCode });
+            }
         }
         
         // Generate order number
@@ -50,9 +85,10 @@ module.exports = cds.service.impl(async function() {
             orderDate: new Date(),
             status: 'PENDING',
             paymentStatus: 'PENDING',
-            originalAmount: totalAmount,    // New required field
-            discountAmount: 0,              // New field - no discount for now
-            totalAmount,                    // Final amount after discount
+            originalAmount,
+            discountAmount,
+            totalAmount: finalAmount,
+            appliedDiscountCode: discountCodeId,
             shippingAddress,
             billingAddress,
             customerEmail,
@@ -71,7 +107,7 @@ module.exports = cds.service.impl(async function() {
             });
         }
         
-        return `Order ${orderNumber} created successfully with total amount ${totalAmount}`;
+        return `Order ${orderNumber} created successfully with total amount $${finalAmount.toFixed(2)}${discountMessage}`;
     });
     
     // Action: Submit Review
@@ -192,6 +228,173 @@ module.exports = cds.service.impl(async function() {
         });
         
         return `Return request ${returnNumber} submitted successfully. Refund amount: ${refundAmount}`;
+    });
+    
+    // Action: Validate Discount Code
+    this.on('validateDiscountCode', async (req) => {
+
+
+
+        const { discountCode, orderTotal } = req.data;
+        
+        if (!discountCode || orderTotal === undefined) {
+            return {
+                isValid: false,
+                discountAmount: 0,
+                finalAmount: orderTotal || 0,
+                message: 'Discount code and order total are required'
+            };
+        }
+        
+        // Find the discount code (case-sensitive)
+        const discount = await SELECT.one.from(DiscountCodes)
+            .where({ code: discountCode });
+        
+        if (!discount) {
+            return {
+                isValid: false,
+                discountAmount: 0,
+                finalAmount: orderTotal,
+                message: 'Invalid discount code'
+            };
+        }
+        
+        // Check if discount is active
+        if (!discount.isActive) {
+            return {
+                isValid: false,
+                discountAmount: 0,
+                finalAmount: orderTotal,
+                message: 'Discount code is inactive'
+            };
+        }
+        
+        // Check date validity
+        const now = new Date();
+        const validFrom = new Date(discount.validFrom);
+        const validTo = new Date(discount.validTo);
+        
+        if (now < validFrom || now > validTo) {
+            return {
+                isValid: false,
+                discountAmount: 0,
+                finalAmount: orderTotal,
+                message: 'Discount code has expired'
+            };
+        }
+        
+        // Check minimum order amount
+        if (orderTotal < discount.minOrderAmount) {
+            return {
+                isValid: false,
+                discountAmount: 0,
+                finalAmount: orderTotal,
+                message: `Minimum order amount of $${discount.minOrderAmount.toFixed(2)} required for this discount code`
+            };
+        }
+        
+        // Check usage limit
+        if (discount.usageLimit && discount.usedCount >= discount.usageLimit) {
+            return {
+                isValid: false,
+                discountAmount: 0,
+                finalAmount: orderTotal,
+                message: 'Discount code usage limit exceeded'
+            };
+        }
+        
+        // Calculate discount amount
+        let discountAmount = 0;
+        
+        if (discount.discountType === 'PERCENTAGE') {
+            discountAmount = (orderTotal * discount.discountValue) / 100;
+            
+            // Apply maximum discount cap if specified
+            if (discount.maxDiscount && discountAmount > discount.maxDiscount) {
+                discountAmount = discount.maxDiscount;
+            }
+        } else if (discount.discountType === 'FIXED_AMOUNT') {
+            discountAmount = discount.discountValue;
+            
+            // Ensure discount doesn't exceed order total
+            if (discountAmount > orderTotal) {
+                discountAmount = orderTotal;
+            }
+        }
+        
+        // Round to 2 decimal places
+        discountAmount = Math.round(discountAmount * 100) / 100;
+        const finalAmount = orderTotal - discountAmount;
+        
+        return {
+            isValid: true,
+            discountType: discount.discountType,
+            discountValue: discount.discountValue,
+            discountAmount,
+            finalAmount,
+            message: 'Discount code is valid'
+        };
+    });
+    
+    // Action: Calculate Order Total
+    this.on('calculateOrderTotal', async (req) => {
+        const { items, discountCode } = req.data;
+        
+        if (!items || items.length === 0) {
+            return {
+                originalAmount: 0,
+                discountAmount: 0,
+                totalAmount: 0,
+                isValidDiscount: false
+            };
+        }
+        
+        // Calculate original total
+        let originalAmount = 0;
+        
+        for (const item of items) {
+            const book = await SELECT.one.from(Books).where({ ID: item.bookId });
+            if (!book) {
+                continue; // Skip non-existent books
+            }
+            
+            originalAmount += book.price * item.quantity;
+        }
+        
+        // Round to 2 decimal places
+        originalAmount = Math.round(originalAmount * 100) / 100;
+        
+        // If no discount code provided, return original amounts
+        if (!discountCode) {
+            return {
+                originalAmount,
+                discountAmount: 0,
+                totalAmount: originalAmount,
+                isValidDiscount: false
+            };
+        }
+        
+        // Validate discount code
+        const discountValidation = await this.send('validateDiscountCode', {
+            discountCode, 
+            orderTotal: originalAmount
+        });
+        
+        if (discountValidation.isValid) {
+            return {
+                originalAmount,
+                discountAmount: discountValidation.discountAmount,
+                totalAmount: discountValidation.finalAmount,
+                isValidDiscount: true
+            };
+        } else {
+            return {
+                originalAmount,
+                discountAmount: 0,
+                totalAmount: originalAmount,
+                isValidDiscount: false
+            };
+        }
     });
     
     // Function: Get Recommendations

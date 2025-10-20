@@ -5,6 +5,7 @@ describe('CustomerService', () => {
     
     // Mock customer user for authentication
     const customerAuth = { auth: { username: 'customer1' } };
+    
 
     describe('Read Operations', () => {
         test('should allow customers to read books catalog', async () => {
@@ -347,6 +348,369 @@ describe('CustomerService', () => {
             // All returned books should contain 'Harry' in title
             response.data.value.forEach(book => {
                 expect(book.title.toLowerCase()).toContain('harry');
+            });
+        });
+    });
+
+    describe('Discount Code Functionality', () => {
+        // Create fresh discount codes before running discount tests
+        beforeAll(async () => {
+            const adminAuth = { auth: { username: 'alice' } };
+            
+            // Create test discount codes with current dates
+            const currentDate = new Date();
+            const validFrom = new Date(currentDate.getFullYear(), 0, 1); // January 1st of current year
+            const validTo = new Date(currentDate.getFullYear(), 11, 31); // December 31st of current year
+            
+            const testDiscountCodes = [
+                {
+                    ID: '550e8400-e29b-41d4-a716-446655440001',
+                    code: 'SAVE10-NEW',
+                    description: '10% off your order',
+                    discountType: 'PERCENTAGE',
+                    discountValue: 10.00,
+                    minOrderAmount: 25.00,
+                    maxDiscount: 50.00,
+                    validFrom: validFrom.toISOString(),
+                    validTo: validTo.toISOString(),
+                    isActive: true,
+                    usageLimit: 500,
+                    usedCount: 15
+                },
+                {
+                    ID: '550e8400-e29b-41d4-a716-446655440002',
+                    code: 'WELCOME20-NEW',
+                    description: 'Welcome discount - 20% off',
+                    discountType: 'PERCENTAGE',
+                    discountValue: 20.00,
+                    minOrderAmount: 50.00,
+                    maxDiscount: 100.00,
+                    validFrom: validFrom.toISOString(),
+                    validTo: validTo.toISOString(),
+                    isActive: true,
+                    usageLimit: 1000,
+                    usedCount: 87
+                },
+                {
+                    ID: '550e8400-e29b-41d4-a716-446655440003',
+                    code: 'FLAT5-NEW',
+                    description: '$5 off any order',
+                    discountType: 'FIXED_AMOUNT',
+                    discountValue: 5.00,
+                    minOrderAmount: 20.00,
+                    maxDiscount: null,
+                    validFrom: validFrom.toISOString(),
+                    validTo: validTo.toISOString(),
+                    isActive: true,
+                    usageLimit: null,
+                    usedCount: 32
+                },
+                {
+                    ID: '550e8400-e29b-41d4-a716-446655440004',
+                    code: 'STUDENT15-NEW',
+                    description: 'Student discount - 15% off',
+                    discountType: 'PERCENTAGE',
+                    discountValue: 15.00,
+                    minOrderAmount: 30.00,
+                    maxDiscount: 75.00,
+                    validFrom: validFrom.toISOString(),
+                    validTo: validTo.toISOString(),
+                    isActive: true,
+                    usageLimit: 200,
+                    usedCount: 45
+                },
+                {
+                    ID: '550e8400-e29b-41d4-a716-446655440005',
+                    code: 'EXPIRED10-NEW',
+                    description: 'Expired 10% discount code',
+                    discountType: 'PERCENTAGE',
+                    discountValue: 10.00,
+                    minOrderAmount: 25.00,
+                    maxDiscount: 50.00,
+                    validFrom: new Date(currentDate.getFullYear() - 2, 0, 1).toISOString(), // 2 years ago
+                    validTo: new Date(currentDate.getFullYear() - 1, 11, 31).toISOString(), // Last year
+                    isActive: true,
+                    usageLimit: 100,
+                    usedCount: 89
+                }
+            ];
+            
+            // Delete existing test discount codes and create new ones
+            for (const discountCode of testDiscountCodes) {
+                try {
+                    // Try to delete existing code first (ignore if it doesn't exist)
+                    await DELETE(`/odata/v4/admin/DiscountCodes(${discountCode.ID})`, adminAuth);
+                } catch (error) {
+                    // Ignore delete errors - code might not exist
+                }
+                
+                // Create the new discount code
+                await POST('/odata/v4/admin/DiscountCodes', discountCode, adminAuth);
+            }
+        });
+        
+        describe('validateDiscountCode Action', () => {
+            test('should validate active discount code SAVE10', async () => {
+                const discountData = {
+                    discountCode: 'SAVE10-NEW',
+                    orderTotal: 30.00
+                };
+
+                const response = await POST('/odata/v4/customer/validateDiscountCode', discountData, customerAuth);
+                
+                expect(response.status).toBe(200);
+
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_validateDiscountCode",
+                    isValid: true,
+                    discountType: 'PERCENTAGE',
+                    discountValue: 10.00,
+                    discountAmount: 3.00,
+                    finalAmount: 27.00,
+                    message: 'Discount code is valid'
+                });
+            });
+
+            test('should validate fixed amount discount code FLAT5', async () => {
+                const discountData = {
+                    discountCode: 'FLAT5-NEW',
+                    orderTotal: 25.00
+                };
+
+                const response = await POST('/odata/v4/customer/validateDiscountCode', discountData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_validateDiscountCode",
+                    isValid: true,
+                    discountType: 'FIXED_AMOUNT',
+                    discountValue: 5.00,
+                    discountAmount: 5.00,
+                    finalAmount: 20.00,
+                    message: 'Discount code is valid'
+                });
+            });
+
+            test('should reject expired discount code EXPIRED10', async () => {
+                const discountData = {
+                    discountCode: 'EXPIRED10-NEW',
+                    orderTotal: 30.00
+                };
+
+                const response = await POST('/odata/v4/customer/validateDiscountCode', discountData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_validateDiscountCode",
+                    isValid: false,
+                    discountAmount: 0,
+                    finalAmount: 30.00,
+                    message: 'Discount code has expired'
+                });
+            });
+
+            test('should reject discount code below minimum order amount', async () => {
+                const discountData = {
+                    discountCode: 'SAVE10-NEW', // min order: $25
+                    orderTotal: 20.00
+                };
+
+                const response = await POST('/odata/v4/customer/validateDiscountCode', discountData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_validateDiscountCode",
+                    isValid: false,
+                    discountAmount: 0,
+                    finalAmount: 20.00,
+                    message: 'Minimum order amount of $25.00 required for this discount code'
+                });
+            });
+
+            test('should reject non-existent discount code', async () => {
+                const discountData = {
+                    discountCode: 'INVALID123',
+                    orderTotal: 30.00
+                };
+
+                const response = await POST('/odata/v4/customer/validateDiscountCode', discountData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_validateDiscountCode",
+                    isValid: false,
+                    discountAmount: 0,
+                    finalAmount: 30.00,
+                    message: 'Invalid discount code'
+                });
+            });
+
+            test('should respect maximum discount amount for percentage discounts', async () => {
+                const discountData = {
+                    discountCode: 'WELCOME20-NEW', // 20% off, max $100
+                    orderTotal: 600.00 // 20% would be $120, but max is $100
+                };
+
+                const response = await POST('/odata/v4/customer/validateDiscountCode', discountData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_validateDiscountCode",
+                    isValid: true,
+                    discountType: 'PERCENTAGE',
+                    discountValue: 20.00,
+                    discountAmount: 100.00, // Capped at maxDiscount
+                    finalAmount: 500.00,
+                    message: 'Discount code is valid'
+                });
+            });
+        });
+
+        describe('calculateOrderTotal Action', () => {
+            test('should calculate order total without discount', async () => {
+                const orderData = {
+                    items: [
+                        { bookId: '550e8400-e29b-41d4-a716-446655442001', quantity: 1 } // Harry Potter $19.99
+                    ]
+                };
+
+                const response = await POST('/odata/v4/customer/calculateOrderTotal', orderData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_calculateOrderTotal",
+                    originalAmount: 19.99,
+                    discountAmount: 0.00,
+                    totalAmount: 19.99,
+                    isValidDiscount: false
+                });
+            });
+
+            test('should calculate order total with valid percentage discount', async () => {
+                const orderData = {
+                    items: [
+                        { bookId: '550e8400-e29b-41d4-a716-446655442009', quantity: 1 } // Harry Potter $29.99
+                    ],
+                    discountCode: 'SAVE10-NEW'
+                };
+
+                const response = await POST('/odata/v4/customer/calculateOrderTotal', orderData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_calculateOrderTotal",
+                    originalAmount: 29.99,
+                    discountAmount: 3.00, // 10% of $29.99, rounded
+                    totalAmount: 26.99,
+                    isValidDiscount: true
+                });
+            });
+
+            test('should calculate order total with valid fixed amount discount', async () => {
+                const orderData = {
+                    items: [
+                        { bookId: '550e8400-e29b-41d4-a716-446655442009', quantity: 1 } // Harry Potter $29.99
+                    ],
+                    discountCode: 'FLAT5-NEW'
+                };
+
+                const response = await POST('/odata/v4/customer/calculateOrderTotal', orderData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_calculateOrderTotal",
+                    originalAmount: 29.99,
+                    discountAmount: 5.00,
+                    totalAmount: 24.99,
+                    isValidDiscount: true
+                });
+            });
+
+            test('should handle invalid discount code gracefully', async () => {
+                const orderData = {
+                    items: [
+                        { bookId: '550e8400-e29b-41d4-a716-446655442009', quantity: 1 }
+                    ],
+                    discountCode: 'INVALID123'
+                };
+
+                const response = await POST('/odata/v4/customer/calculateOrderTotal', orderData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data).toEqual({
+                    "@odata.context": "$metadata#CustomerService.return_CustomerService_calculateOrderTotal",
+                    originalAmount: 29.99,
+                    discountAmount: 0.00,
+                    totalAmount: 29.99,
+                    isValidDiscount: false
+                });
+            });
+        });
+
+        describe('Enhanced Purchase Books with Discount', () => {
+            test('should successfully purchase books with valid discount code', async () => {
+                const purchaseData = {
+                    items: [
+                        { bookId: '550e8400-e29b-41d4-a716-446655442009', quantity: 1 }
+                    ],
+                    discountCode: 'SAVE10-NEW',
+                    shippingAddress: '123 Test St, Test City',
+                    billingAddress: '123 Test St, Test City',
+                    customerEmail: 'test@example.com',
+                    customerPhone: '+1234567890'
+                };
+
+                const response = await POST('/odata/v4/customer/purchaseBooks', purchaseData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data.value).toContain('Order');
+                expect(response.data.value).toContain('created successfully');
+                expect(response.data.value).toContain('discount applied');
+            });
+
+            test('should purchase books with invalid discount code (ignoring discount)', async () => {
+                const purchaseData = {
+                    items: [
+                        { bookId: '550e8400-e29b-41d4-a716-446655442009', quantity: 1 }
+                    ],
+                    discountCode: 'INVALID123',
+                    shippingAddress: '123 Test St, Test City',
+                    billingAddress: '123 Test St, Test City',
+                    customerEmail: 'test@example.com',
+                    customerPhone: '+1234567890'
+                };
+
+                const response = await POST('/odata/v4/customer/purchaseBooks', purchaseData, customerAuth);
+                
+                expect(response.status).toBe(200);
+                expect(response.data.value).toContain('Order');
+                expect(response.data.value).toContain('created successfully');
+                expect(response.data.value).not.toContain('discount applied');
+            });
+
+            test('should update discount usage counter after successful purchase', async () => {
+                // First get the current usage count for FLAT5
+                const beforeResponse = await GET('/odata/v4/admin/DiscountCodes?$filter=code eq \'FLAT5-NEW\'', { auth: { username: 'alice' } });
+                const beforeUsage = beforeResponse.data.value[0].usedCount;
+
+                const purchaseData = {
+                    items: [
+                        { bookId: '550e8400-e29b-41d4-a716-446655442009', quantity: 1 }
+                    ],
+                    discountCode: 'FLAT5-NEW',
+                    shippingAddress: '123 Test St, Test City',
+                    billingAddress: '123 Test St, Test City',
+                    customerEmail: 'test@example.com',
+                    customerPhone: '+1234567890'
+                };
+
+                await POST('/odata/v4/customer/purchaseBooks', purchaseData, customerAuth);
+
+                // Check that usage count increased
+                const afterResponse = await GET('/odata/v4/admin/DiscountCodes?$filter=code eq \'FLAT5-NEW\'', { auth: { username: 'alice' } });
+                const afterUsage = afterResponse.data.value[0].usedCount;
+
+                expect(afterUsage).toBe(beforeUsage + 1);
             });
         });
     });

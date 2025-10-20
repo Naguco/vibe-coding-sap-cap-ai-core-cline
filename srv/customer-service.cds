@@ -55,6 +55,7 @@ service CustomerService {
             bookId: UUID;
             quantity: Integer;
         },
+        discountCode: String,
         shippingAddress: String,
         billingAddress: String,
         customerEmail: String,
@@ -74,6 +75,32 @@ service CustomerService {
         quantity: Integer,
         reason: String
     ) returns String;
+    
+    // Discount-related actions
+    action validateDiscountCode(
+        discountCode: String,
+        orderTotal: Decimal(10,2)
+    ) returns {
+        isValid: Boolean;
+        discountType: String;
+        discountValue: Decimal(10,2);
+        discountAmount: Decimal(10,2);
+        finalAmount: Decimal(10,2);
+        message: String;
+    };
+    
+    action calculateOrderTotal(
+        items: array of {
+            bookId: UUID;
+            quantity: Integer;
+        },
+        discountCode: String
+    ) returns {
+        originalAmount: Decimal(10,2);
+        discountAmount: Decimal(10,2);
+        totalAmount: Decimal(10,2);
+        isValidDiscount: Boolean;
+    };
     
     // Customer utility functions
     function getRecommendations() returns array of Books;
