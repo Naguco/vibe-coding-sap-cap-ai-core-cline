@@ -624,14 +624,15 @@ module.exports = cds.service.impl(async function() {
         };
     });
 
-    // Action: Update Cart Item
-    this.on('updateCartItem', async (req) => {
-        const { itemId, quantity } = req.data;
+    // Action: Update Cart Item (bound to MyShoppingCartItems)
+    this.on('updateCartItem', 'MyShoppingCartItems', async (req) => {
+        const { quantity } = req.data;
+        const itemId = req.params[1].ID; // The cart item ID comes from the nested path
         const user = req.user.id;
         
         // Validate input
-        if (!itemId || !quantity) {
-            req.error(400, 'Item ID and quantity are required');
+        if (!quantity) {
+            req.error(400, 'Quantity is required');
             return;
         }
         
@@ -640,11 +641,18 @@ module.exports = cds.service.impl(async function() {
             return;
         }
         
-        // Find cart item and verify it belongs to user
+        // Find cart item and verify it belongs to user through cart relationship
         const cartItem = await SELECT.one.from(MyShoppingCartItems)
-            .where({ ID: itemId, 'cart.createdBy': user });
+            .columns('ID', 'cart_ID', 'book_ID', 'cart.createdBy')
+            .where({ ID: itemId });
         
         if (!cartItem) {
+            req.error(404, 'Cart item not found');
+            return;
+        }
+        
+        // Verify the cart belongs to the current user
+        if (cartItem.cart_createdBy !== user) {
             req.error(404, 'Cart item not found');
             return;
         }
@@ -677,22 +685,23 @@ module.exports = cds.service.impl(async function() {
         };
     });
 
-    // Action: Remove from Cart
-    this.on('removeFromCart', async (req) => {
-        const { itemId } = req.data;
+    // Action: Remove from Cart (bound to MyShoppingCartItems)
+    this.on('removeFromCart', 'MyShoppingCartItems', async (req) => {
+        const itemId = req.params[1].ID; // The cart item ID comes from the nested path
         const user = req.user.id;
+
+        // Find cart item and verify it belongs to user through cart relationship
+        const cartItem = await SELECT.one.from(MyShoppingCartItems)
+            .columns('ID', 'cart_ID', 'cart.createdBy')
+            .where({ ID: itemId });
         
-        // Validate input
-        if (!itemId) {
-            req.error(400, 'Item ID is required');
+        if (!cartItem) {
+            req.error(404, 'Cart item not found');
             return;
         }
         
-        // Find cart item and verify it belongs to user
-        const cartItem = await SELECT.one.from(MyShoppingCartItems)
-            .where({ ID: itemId, 'cart.createdBy': user });
-        
-        if (!cartItem) {
+        // Verify the cart belongs to the current user
+        if (cartItem.cart_createdBy !== user) {
             req.error(404, 'Cart item not found');
             return;
         }
@@ -711,18 +720,22 @@ module.exports = cds.service.impl(async function() {
         };
     });
 
-    // Action: Clear Cart
-    this.on('clearCart', async (req) => {
+    // Action: Clear Cart (bound to MyShoppingCart)
+    this.on('clearCart', 'MyShoppingCart', async (req) => {
+        const cartId = req.params[0].ID; // The cart ID comes from the entity context
         const user = req.user.id;
         
-        // Find user's active cart
+        // Verify cart belongs to user
         const cart = await SELECT.one.from(MyShoppingCart)
-            .where({ createdBy: user, status: 'ACTIVE' });
+            .where({ ID: cartId, createdBy: user, status: 'ACTIVE' });
         
-        if (cart) {
-            // Delete all cart items
-            await DELETE.from(MyShoppingCartItems).where({ cart_ID: cart.ID });
+        if (!cart) {
+            req.error(404, 'Active cart not found');
+            return;
         }
+        
+        // Delete all cart items
+        await DELETE.from(MyShoppingCartItems).where({ cart_ID: cartId });
         
         return {
             success: true,
@@ -730,56 +743,59 @@ module.exports = cds.service.impl(async function() {
         };
     });
 
-    // Action: Get Cart Summary
-    this.on('getCartSummary', async (req) => {
+    // Action: Get Cart Summary (bound to MyShoppingCart)
+    this.on('getCartSummary', 'MyShoppingCart', async (req) => {
+        const cartId = req.params[0].ID; // The cart ID comes from the entity context
         const user = req.user.id;
         
-        // Find user's active cart
+        // Verify cart belongs to user
         const cart = await SELECT.one.from(MyShoppingCart)
-            .where({ createdBy: user, status: 'ACTIVE' });
+            .where({ ID: cartId, createdBy: user });
         
         if (!cart) {
-            return {
-                items: [],
-                totalItems: 0,
-                totalAmount: 0
-            };
+            req.error(404, 'Cart not found');
+            return;
         }
         
         // Get cart items with book details
         const cartItems = await SELECT.from(MyShoppingCartItems)
             .columns('ID', 'quantity', 'book_ID', 'book.title', 'book.author.name as authorName', 'book.price')
-            .where({ cart_ID: cart.ID });
+            .where({ cart_ID: cartId });
+        
+        if (cartItems.length === 0) {
+            req.info('Your cart is empty.');
+            return { success: true, message: 'Your cart is empty.' };
+        }
         
         let totalItems = 0;
         let totalAmount = 0;
+        let summaryText = 'Cart Summary:\n\n';
         
-        const items = cartItems.map(item => {
+        cartItems.forEach(item => {
             const subtotal = item.book_price * item.quantity;
             totalItems += item.quantity;
             totalAmount += subtotal;
             
-            return {
-                itemId: item.ID,
-                bookId: item.book_ID,
-                bookTitle: item.book_title,
-                bookAuthor: item.authorName,
-                quantity: item.quantity,
-                unitPrice: item.book_price,
-                subtotal: Math.round(subtotal * 100) / 100
-            };
+            summaryText += `• ${item.book_title} by ${item.authorName}\n`;
+            summaryText += `  Quantity: ${item.quantity} × $${item.book_price.toFixed(2)} = $${subtotal.toFixed(2)}\n\n`;
         });
         
+        summaryText += `Total Items: ${totalItems}\n`;
+        summaryText += `Total Amount: $${totalAmount.toFixed(2)}`;
+        
+        // Use req.info to display the summary as a message to the user
+        req.info(summaryText);
+        
         return {
-            items,
-            totalItems,
-            totalAmount: Math.round(totalAmount * 100) / 100
+            success: true,
+            message: `Cart contains ${totalItems} items with total amount $${totalAmount.toFixed(2)}`
         };
     });
 
-    // Action: Purchase from Cart
-    this.on('purchaseFromCart', async (req) => {
+    // Action: Purchase from Cart (bound to MyShoppingCart)
+    this.on('purchaseFromCart', 'MyShoppingCart', async (req) => {
         const { discountCode, shippingAddress, billingAddress, customerEmail, customerPhone } = req.data;
+        const cartId = req.params[0].ID; // The cart ID comes from the entity context
         const user = req.user.id;
         
         // Validate required fields
@@ -788,19 +804,19 @@ module.exports = cds.service.impl(async function() {
             return;
         }
         
-        // Find user's active cart
+        // Verify cart belongs to user and is active
         const cart = await SELECT.one.from(MyShoppingCart)
-            .where({ createdBy: user, status: 'ACTIVE' });
+            .where({ ID: cartId, createdBy: user, status: 'ACTIVE' });
         
         if (!cart) {
-            req.error(400, 'No active cart found');
+            req.error(404, 'Active cart not found');
             return;
         }
         
         // Get cart items
         const cartItems = await SELECT.from(MyShoppingCartItems)
             .columns('quantity', 'book_ID')
-            .where({ cart_ID: cart.ID });
+            .where({ cart_ID: cartId });
         
         if (cartItems.length === 0) {
             req.error(400, 'Cart is empty');
@@ -824,11 +840,11 @@ module.exports = cds.service.impl(async function() {
         });
         
         // Clear cart after successful purchase
-        await DELETE.from(MyShoppingCartItems).where({ cart_ID: cart.ID });
+        await DELETE.from(MyShoppingCartItems).where({ cart_ID: cartId });
         
         // Mark cart as converted
         await UPDATE(MyShoppingCart)
-            .where({ ID: cart.ID })
+            .where({ ID: cartId })
             .with({ status: 'CONVERTED' });
         
         return orderResult.replace('created successfully', 'created successfully from cart');

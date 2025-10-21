@@ -333,6 +333,18 @@ annotate service.MyShoppingCartItems with @(
             Label : 'Added At',
             Value : createdAt,
         },
+        {
+            $Type : 'UI.DataFieldForAction',
+            Action : 'CustomerService.updateCartItem',
+            Label : 'Update Quantity',
+            Inline : true,
+        },
+        {
+            $Type : 'UI.DataFieldForAction',
+            Action : 'CustomerService.removeFromCart',
+            Label : 'Remove',
+            Inline : true,
+        },
     ],
     UI.FieldGroup #CartItemDetails : {
         $Type : 'UI.FieldGroupType',

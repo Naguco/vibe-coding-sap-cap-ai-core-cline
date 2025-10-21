@@ -65,6 +65,31 @@ service CustomerService {
         items: redirected to MyShoppingCartItems,
         virtual totalItems: Integer,
         virtual totalAmount: Decimal(10,2)
+    }
+    actions {
+        @Common.SideEffects: {
+            TargetEntities: [
+                'items',
+                '_parent'
+            ]
+        }
+        action clearCart() returns {
+            success: Boolean;
+            message: String;
+        };
+        
+        action purchaseFromCart(
+            discountCode: String,
+            shippingAddress: String,
+            billingAddress: String,
+            customerEmail: String,
+            customerPhone: String
+        ) returns String;
+        
+        action getCartSummary() returns {
+            success: Boolean;
+            message: String;
+        };
     };
     
     entity MyShoppingCartItems as projection on bookstore.ShoppingCartItems {
@@ -73,6 +98,35 @@ service CustomerService {
         book: redirected to Books,
         virtual subtotal: Decimal(10,2),
         virtual unitPrice: Decimal(10,2)
+    }
+    actions {
+        @Common.SideEffects: {
+            TargetEntities: [
+                '_parent',
+                'cart'
+            ]
+        }
+        action updateCartItem(
+            quantity: Integer
+        ) returns {
+            success: Boolean;
+            message: String;
+            cartItemCount: Integer;
+            cartTotal: Decimal(10,2);
+        };
+        
+        @Common.SideEffects: {
+            TargetEntities: [
+                '_parent',
+                'cart'
+            ]
+        }
+        action removeFromCart() returns {
+            success: Boolean;
+            message: String;
+            cartItemCount: Integer;
+            cartTotal: Decimal(10,2);
+        };
     };
     
     // Customer-specific actions for business operations
@@ -129,52 +183,6 @@ service CustomerService {
     };
     
     
-    action updateCartItem(
-        itemId: UUID,
-        quantity: Integer
-    ) returns {
-        success: Boolean;
-        message: String;
-        cartItemCount: Integer;
-        cartTotal: Decimal(10,2);
-    };
-    
-    action removeFromCart(
-        itemId: UUID
-    ) returns {
-        success: Boolean;
-        message: String;
-        cartItemCount: Integer;
-        cartTotal: Decimal(10,2);
-    };
-    
-    action clearCart() returns {
-        success: Boolean;
-        message: String;
-    };
-    
-    action getCartSummary() returns {
-        items: array of {
-            itemId: UUID;
-            bookId: UUID;
-            bookTitle: String;
-            bookAuthor: String;
-            quantity: Integer;
-            unitPrice: Decimal(10,2);
-            subtotal: Decimal(10,2);
-        };
-        totalItems: Integer;
-        totalAmount: Decimal(10,2);
-    };
-    
-    // Enhanced purchase action to work with cart
-    action purchaseFromCart(
-        discountCode: String,
-        shippingAddress: String,
-        billingAddress: String,
-        customerEmail: String,
-        customerPhone: String
-    ) returns String;
     
     // Customer utility functions
     function getRecommendations() returns array of Books;
@@ -203,9 +211,9 @@ annotate CustomerService.MyReturns with @(restrict: [
 ]);
 
 annotate CustomerService.MyShoppingCart with @(restrict: [
-    { grant: ['READ', 'CREATE', 'UPDATE', 'DELETE'], to: 'customer', where: 'createdBy = $user' }
+    { grant: ['READ', 'CREATE', 'UPDATE', 'DELETE', 'clearCart', 'getCartSummary', 'purchaseFromCart'], to: 'customer', where: 'createdBy = $user' }
 ]);
 
 annotate CustomerService.MyShoppingCartItems with @(restrict: [
-    { grant: ['READ', 'CREATE', 'UPDATE', 'DELETE'], to: 'customer', where: 'cart.createdBy = $user' }
+    { grant: ['READ', 'CREATE', 'UPDATE', 'DELETE', 'updateCartItem', 'removeFromCart'], to: 'customer', where: 'createdBy = $user' }
 ]);
