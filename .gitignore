@@ -8,10 +8,15 @@ default-*.json
 gen/
 node_modules/
 target/
+dist/
+db/src/
+db/undeploy.json
+
 
 # Web IDE, App Studio
 .che/
 .gen/
+.vscode/*.json
 
 # MTA
 *_mta_build_tmp

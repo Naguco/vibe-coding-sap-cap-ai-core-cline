@@ -1,0 +1,147 @@
+_schema-version: 3.3.0
+ID: bookstore-app-ai
+version: 1.0.0
+description: "A simple CAP project."
+parameters:
+  enable-parallel-deployments: true
+  deploy_mode: html5-repo
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production
+modules:
+  - name: bookstore-app-ai-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      instances: 1
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm-ci
+    provides:
+      - name: srv-api # required by consumers of CAP services (e.g. approuter)
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: bookstore-app-ai-auth
+      - name: bookstore-app-ai-db
+      - name: bookstore-app-ai-destination
+
+  - name: bookstore-app-ai-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: bookstore-app-ai-db
+
+  - name: bookstore-app-ai-app-deployer
+    type: com.sap.application.content
+    path: gen
+    requires:
+      - name: bookstore-app-ai-auth
+      - name: srv-api
+      - name: bookstore-app-ai-html5-repo-host
+        parameters:
+          content-target: true
+          config:
+            HTML5Runtime_enabled: true
+    build-parameters:
+      build-result: app/
+      requires:
+        - name: bookstoreappaicustomershoppingui
+          artifacts:
+            - customer-shopping-ui.zip
+          target-path: app/
+
+  - name: bookstoreappaicustomershoppingui
+    type: html5
+    path: app/customer-shopping-ui
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm ci
+        - npm run build
+      supported-platforms:
+        []
+
+  - name: bookstore-app-ai-destinations
+    type: com.sap.application.content
+    requires:
+      - name: bookstore-app-ai-auth
+        parameters:
+          service-key:
+            name: bookstore-app-ai-auth-key
+      - name: bookstore-app-ai-html5-repo-host
+        parameters:
+          service-key:
+            name: bookstore-app-ai-html5-repo-host-key
+      - name: srv-api
+      - name: bookstore-app-ai-destination
+        parameters:
+          content-target: true
+    build-parameters:
+      no-source: true
+    parameters:
+      content:
+        instance:
+          existing_destinations_policy: update
+          destinations:
+            - Name: bookstore-app-ai-srv
+              Authentication: OAuth2UserTokenExchange
+              TokenServiceInstanceName: bookstore-app-ai-auth
+              TokenServiceKeyName: bookstore-app-ai-auth-key
+              URL:  ~{srv-api/srv-url}
+              sap.cloud.service: bookstoreappai.service
+            - Name: bookstore-app-ai-html5-repository
+              ServiceInstanceName: bookstore-app-ai-html5-repo-host
+              ServiceKeyName: bookstore-app-ai-html5-repo-host-key
+              sap.cloud.service: bookstoreappai.service
+            - Name: bookstore-app-ai-auth
+              Authentication: OAuth2UserTokenExchange
+              ServiceInstanceName: bookstore-app-ai-auth
+              ServiceKeyName: bookstore-app-ai-auth-key
+              sap.cloud.service: bookstoreappai.service
+
+resources:
+  - name: bookstore-app-ai-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+  - name: bookstore-app-ai-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  - name: bookstore-app-ai-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite
+      config:
+        HTML5Runtime_enabled: true
+        init_data:
+          instance:
+            existing_destinations_policy: update
+            destinations:
+              - Name: ui5
+                URL: https://ui5.sap.com
+                Authentication: NoAuthentication
+                Type: HTTP
+                ProxyType: Internet
+
+  - name: bookstore-app-ai-html5-repo-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
+  - name: bookstore-app-ai-html5-runtime
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-runtime

@@ -1,0 +1,32 @@
+{
+  "xsappname": "bookstore-app-ai",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.admin",
+      "description": "admin"
+    },
+    {
+      "name": "$XSAPPNAME.customer",
+      "description": "customer"
+    }
+  ],
+  "attributes": [],
+  "role-templates": [
+    {
+      "name": "admin",
+      "description": "generated",
+      "scope-references": [
+        "$XSAPPNAME.admin"
+      ],
+      "attribute-references": []
+    },
+    {
+      "name": "customer",
+      "description": "generated",
+      "scope-references": [
+        "$XSAPPNAME.customer"
+      ],
+      "attribute-references": []
+    }
+  ]
+}
