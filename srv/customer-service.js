@@ -777,11 +777,11 @@ module.exports = cds.service.impl(async function() {
             totalAmount += subtotal;
             
             summaryText += `• ${item.book_title} by ${item.authorName}\n`;
-            summaryText += `  Quantity: ${item.quantity} × $${item.book_price.toFixed(2)} = $${subtotal.toFixed(2)}\n\n`;
+            summaryText += `  Quantity: ${item.quantity} × $${Number.parseFloat(item.book_price).toFixed(2)} = $${Number.parseFloat(subtotal).toFixed(2)}\n\n`;
         });
         
         summaryText += `Total Items: ${totalItems}\n`;
-        summaryText += `Total Amount: $${totalAmount.toFixed(2)}`;
+        summaryText += `Total Amount: $${Number.parseFloat(totalAmount).toFixed(2)}`;
         
         // Use req.info to display the summary as a message to the user
         req.info(summaryText);
