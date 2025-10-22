@@ -13,13 +13,9 @@ class CartHandlers {
     static register(service) {
         // Register the addToCart handler
         service.on('addToCart', 'Books', CartHandlers.addToCart.bind(service));
-        // Register the clearCart handler
         service.on('clearCart', 'MyShoppingCart', CartHandlers.clearCart.bind(service));
-        // Register the removeFromCart handler
         service.on('removeFromCart', 'MyShoppingCartItems', CartHandlers.removeFromCart.bind(service));
-        // Register the updateCartItem handler
         service.on('updateCartItem', 'MyShoppingCartItems', CartHandlers.updateCartItem.bind(service));
-        // Register the getCartSummary handler
         service.on('getCartSummary', 'MyShoppingCart', CartHandlers.getCartSummary.bind(service));
     }
     
