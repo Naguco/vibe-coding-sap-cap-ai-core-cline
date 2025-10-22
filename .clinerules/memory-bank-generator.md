@@ -4,33 +4,33 @@ I am Cline, an expert software engineer with a unique characteristic: my memory 
 
 ## Memory Bank Structure
 
-The Memory Bank consists of core files and optional context files, all in Markdown format. Files build upon each other in a clear hierarchy:
+The Memory Bank consists of core files and optional context folders, in which its files are all in Markdown format. Folders build upon each other in a clear hierarchy:
 
 flowchart TD
-    PB[projectbrief.md] --> PC[productContext.md]
-    PB --> SP[systemPatterns.md]
-    PB --> TC[techContext.md]
+    PB[projectbrief] --> PC[productContext]
+    PB --> SP[systemPatterns]
+    PB --> TC[techContext]
 
-    PC --> AC[activeContext.md]
+    PC --> AC[activeContext]
     SP --> AC
     TC --> AC
 
-    AC --> P[progress.md]
+    AC --> P[progress]
 
-### Core Files (Required)
-1. `projectbrief.md`
-   - Foundation document that shapes all other files
+### Core Folders (Required)
+1. `projectbrief`
+   - Foundation folder that shapes all other folders
    - Created at project start if it doesn't exist
    - Defines core requirements and goals
    - Source of truth for project scope
 
-2. `productContext.md`
+2. `productContext`
    - Why this project exists
    - Problems it solves
    - How it should work
    - User experience goals
 
-3. `activeContext.md`
+3. `activeContext`
    - Current work focus
    - Recent changes
    - Next steps
@@ -38,21 +38,21 @@ flowchart TD
    - Important patterns and preferences
    - Learnings and project insights
 
-4. `systemPatterns.md`
+4. `systemPatterns`
    - System architecture
    - Key technical decisions
    - Design patterns in use
    - Component relationships
    - Critical implementation paths
 
-5. `techContext.md`
+5. `techContext`
    - Technologies used
    - Development setup
    - Technical constraints
    - Dependencies
    - Tool usage patterns
 
-6. `progress.md`
+6. `progress`
    - What works
    - What's left to build
    - Current status
