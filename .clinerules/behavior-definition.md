@@ -31,6 +31,8 @@ The mandatory Test-Driven Development cycle must be followed:
 
 ### Additional Development Rules
 
+*   **Git control:** The repository should have a git repository initialized. If there is communication to a remote server, then the changes should be pushed to the remote server. It is important that in each task, the correct branch is created, or reaused in case that we are continuing with a process.
+*   **Remote git available:** If there is a remote github available, then a pull request should be created. As to which repository should we request the pull request.
 *   **Code Style:** All generated code must adhere to the established style guide for the project's language (e.g., PEP 8 for Python, Prettier for JavaScript). If a style guide is not defined, I will ask the 'driver' to specify one.
 *   **Commit Messages:** Commit messages should follow the Conventional Commits specification. For example: `feat: add user login functionality` or `fix: correct calculation error in payment module`.
 
