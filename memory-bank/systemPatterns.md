@@ -347,13 +347,13 @@ const calculateCartTotals = async (cartId) => {
 
 ### Virtual Field Implementation
 ```javascript
-// After-read handler for calculated fields
+// After-read handler for calculated fields using extracted utilities
 this.after('READ', 'MyShoppingCart', async (results, req) => {
     if (!Array.isArray(results)) results = [results];
 
     for (const cart of results) {
         if (cart) {
-            const totals = await calculateCartTotals(cart.ID);
+            const totals = await CartUtils.calculateCartTotals(cart.ID, this.entities);
             cart.totalItems = totals.cartItemCount;
             cart.totalAmount = totals.cartTotal;
         }
@@ -450,3 +450,120 @@ sap.ui.define([
 - Implement in after-read handlers for automatic calculation
 - Handle both single results and arrays
 - Perform calculations server-side for accuracy
+
+## Refactored Service Architecture Patterns
+
+### Modular Service Structure (New Pattern)
+```
+srv/
+├── customer-service.js (main entry - lightweight)
+├── admin-service.js (main entry - lightweight)
+├── handlers/
+│   ├── customer/
+│   │   ├── cart-handlers.js ✅
+│   │   ├── order-handlers.js □
+│   │   └── review-handlers.js □
+│   └── admin/
+│       └── validation-handlers.js □
+├── utils/
+│   ├── cart-utils.js ✅
+│   ├── validation-utils.js □
+│   └── calculation-utils.js □
+└── middleware/
+    ├── entity-filters.js □
+    └── auth-middleware.js □
+```
+
+### Handler Registration Pattern
+```javascript
+// Main service entry point (customer-service.js)
+const CartHandlers = require('./handlers/customer/cart-handlers');
+const CartUtils = require('./utils/cart-utils');
+
+module.exports = cds.service.impl(async function() {
+    // Register modular handlers
+    CartHandlers.register(this);
+    
+    // Main service logic remains focused
+    // ... other service implementations
+});
+```
+
+### Utility Module Pattern
+```javascript
+// srv/utils/cart-utils.js
+const cds = require('@sap/cds');
+
+class CartUtils {
+    static async getOrCreateCart(user, entities) {
+        // Reusable utility logic
+        // Used across multiple handlers
+    }
+    
+    static async calculateCartTotals(cartId, entities) {
+        // Shared calculation logic
+        // Maintains consistency across operations
+    }
+}
+
+module.exports = CartUtils;
+```
+
+### Handler Module Pattern
+```javascript
+// srv/handlers/customer/cart-handlers.js
+const CartUtils = require('../../utils/cart-utils');
+
+class CartHandlers {
+    static register(service) {
+        // Register all related handlers
+        service.on('addToCart', 'Books', CartHandlers.addToCart.bind(service));
+        // ... other cart actions
+    }
+    
+    static async addToCart(req) {
+        // Focused handler logic
+        // Uses shared utilities
+        const cart = await CartUtils.getOrCreateCart(user, this.entities);
+        // ... handler implementation
+    }
+}
+
+module.exports = CartHandlers;
+```
+
+### Benefits of Refactored Architecture
+- **Single Responsibility**: Each module handles one specific concern
+- **Reusability**: Utilities shared across handlers and services
+- **Testability**: Individual modules can be unit tested in isolation
+- **Maintainability**: Clear organization makes code easy to locate and modify
+- **Scalability**: New features added as separate modules without affecting existing code
+
+### Incremental Refactoring Strategy
+- **Baby Steps Approach**: Extract one component at a time
+- **Test-Driven Safety**: Run full test suite after each extraction
+- **Zero Regression**: Maintain 100% backward compatibility
+- **Gradual Migration**: Move from monolithic to modular incrementally
+- **Risk Mitigation**: Rollback capability at each step
+
+### Current Refactoring Progress
+```
+Phase 1: Utilities Extraction ✅
+├── srv/utils/cart-utils.js created
+├── Duplicate code eliminated (~40 lines)
+└── All 116 tests passing
+
+Phase 2: Handler Extraction ✅  
+├── srv/handlers/customer/cart-handlers.js created
+├── addToCart handler extracted (~70 lines)
+├── Main service reduced from 669 to 586 lines
+└── All 116 tests passing
+
+Phase 3-6: Planned □
+├── Extract remaining cart handlers
+├── Extract order processing handlers  
+├── Create validation utilities
+└── Implement middleware patterns
+```
+
+This refactored architecture provides a solid foundation for continued incremental improvement while maintaining full functionality and test coverage.

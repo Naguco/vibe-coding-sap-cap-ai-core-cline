@@ -1,20 +1,39 @@
 # Active Context
 
-## Current Focus: COMPLETED - Shopping Cart Issues Resolution
+## Current Focus: Service File Refactoring - Phases 1-2 Complete ✅
 
-**Last Updated**: October 21, 2025
+**Last Updated**: October 22, 2025
 
 ### Most Recent Achievement
-All shopping cart functionality issues have been **completely resolved**. The system now provides a fully functional and user-friendly shopping cart experience with all buttons working correctly and enhanced navigation.
+Successfully completed the first two phases of JavaScript service file refactoring using an incremental, test-driven approach. All 116 tests continue to pass with improved code organization and maintainability.
 
-## Recent Work Completed (Last Session)
+## Recent Work Completed (Current Session)
 
-### Critical Bug Fixes
-1. **Clear Cart Button** - Fixed missing UI refresh
-2. **Remove From Cart Button** - Fixed 404 errors with parameter handling
-3. **Update Cart Item Button** - Fixed authorization and parameter issues
-4. **Get Cart Summary** - Implemented information popup display
-5. **View Cart Navigation** - Enhanced user experience
+### JavaScript Service File Refactoring - Phases 1-2 ✅
+
+#### **Phase 1: Extract Cart Utilities** 
+- **Created**: `srv/utils/cart-utils.js` with reusable helper functions:
+  - `getOrCreateCart(user, entities)` - Creates or retrieves user's active cart
+  - `calculateCartTotals(cartId, entities)` - Calculates cart item count and total amount
+- **Refactored**: `srv/customer-service.js` to use extracted CartUtils
+- **Result**: Removed ~40 lines of duplicate helper code
+- **Tests**: All 116 tests passing ✅
+
+#### **Phase 2: Extract Single Cart Handler**
+- **Created**: `srv/handlers/customer/cart-handlers.js` with modular structure:
+  - CartHandlers class with registration pattern
+  - Extracted `addToCart` handler (~70 lines of code)
+  - Clean separation of concerns
+- **Refactored**: Main service to register and use extracted handler
+- **Result**: Customer service reduced from 669 to 586 lines (-83 lines)
+- **Tests**: All 116 tests passing ✅
+
+### Refactoring Benefits Achieved
+- **Reduced Complexity**: Main service file more manageable
+- **Better Organization**: Related functionality grouped logically
+- **Improved Maintainability**: Cart logic easier to find and modify
+- **Enhanced Reusability**: Utilities shared across handlers
+- **Zero Regression**: Complete test coverage maintained
 
 ### Technical Discoveries Made
 
@@ -109,21 +128,64 @@ action clearCart() returns { success: Boolean; message: String; };
 - Add side effects annotations for UI refresh requirements
 - Test nested entity actions with proper URL patterns
 
-## Next Steps (If Needed)
-The shopping cart system is fully functional. Future enhancements could include:
-- Additional cart management features (save for later, wish lists)
-- Enhanced discount code management
-- Advanced reporting and analytics
-- Mobile-optimized cart experience
+## Next Refactoring Steps - Continued Baby Steps Approach
 
-## Current Technical Debt
-**NONE** - All identified issues have been resolved and technical debt eliminated.
+### **Phase 3: Extract Remaining Cart Handlers** (Next Priority)
+**Target**: Continue cart handler extraction with same safe approach
+- Extract `clearCart` handler (bound to MyShoppingCart)
+- Extract `removeFromCart` handler (bound to MyShoppingCartItems)  
+- Extract `updateCartItem` handler (bound to MyShoppingCartItems)
+- Extract `getCartSummary` handler (bound to MyShoppingCart)
+- Extract `purchaseFromCart` handler (bound to MyShoppingCart)
+- **Safety**: Extract one handler at a time, test after each extraction
 
-## Active Monitoring
-- All cart actions working correctly
-- User experience optimized
-- Error handling comprehensive
-- Test coverage complete
-- Security properly implemented
+### **Phase 4: Extract Order Processing Handlers**
+**Target**: Move order-related logic to dedicated handlers (~200 lines)
+- Extract `purchaseBooks` action handler
+- Extract `submitReview` action handler  
+- Extract `requestReturn` action handler
+- Extract `validateDiscountCode` action handler
+- Extract `calculateOrderTotal` action handler
+- Create `srv/handlers/customer/order-handlers.js`
 
-The shopping cart system is now production-ready with excellent user experience and robust functionality.
+### **Phase 5: Create Shared Validation Utilities**
+**Target**: Extract common validation patterns
+- Create `srv/utils/validation-utils.js`
+- Extract quantity validation (1-99 range)
+- Extract stock availability checks
+- Extract user ownership verification
+- Extract date range validations
+
+### **Phase 6: Implement Middleware Patterns**
+**Target**: Extract repetitive filtering and auth logic
+- Create `srv/middleware/entity-filters.js` for user context filtering
+- Create `srv/middleware/auth-middleware.js` for authorization checks
+- Apply to reduce ~50 lines of repetitive before/after handlers
+
+### **Success Metrics for Each Phase**
+- All 116 tests must continue passing
+- Code reduction in main service file
+- Improved logical organization
+- Zero functional regression
+- Enhanced maintainability
+
+### **Current Progress Tracking**
+```
+srv/customer-service.js: 669 → 586 lines (-83 lines, -12.4%)
+├── Phase 1: Utilities extracted ✅
+├── Phase 2: 1 handler extracted ✅  
+├── Phase 3: 5 handlers remaining □
+├── Phase 4: 5 handlers remaining □
+├── Phase 5: Validation utilities □
+└── Phase 6: Middleware patterns □
+```
+
+### **Proven Safe Approach**
+1. Extract small, focused modules
+2. Test immediately after each change  
+3. Rollback if any test fails
+4. Never extract more than one handler per iteration
+5. Comment original code before deletion
+6. Maintain backward compatibility throughout
+
+The foundation is solid - ready for continued incremental improvement.

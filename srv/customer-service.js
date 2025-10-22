@@ -1,4 +1,6 @@
 const cds = require('@sap/cds');
+const CartUtils = require('./utils/cart-utils');
+const CartHandlers = require('./handlers/customer/cart-handlers');
 
 module.exports = cds.service.impl(async function() {
     
@@ -7,6 +9,9 @@ module.exports = cds.service.impl(async function() {
     // Get the underlying database service to access DiscountCodes without exposing it to customers
     const db = await cds.connect.to('db');
     const { DiscountCodes } = db.entities('bookstore');
+    
+    // Register cart handlers
+    CartHandlers.register(this);
     
     // Action: Purchase Books
     this.on('purchaseBooks', async (req) => {
@@ -503,126 +508,7 @@ module.exports = cds.service.impl(async function() {
     });
 
     // SHOPPING CART ACTIONS
-
-    // Helper function to get or create user's active cart
-    const getOrCreateCart = async (user) => {
-        let cart = await SELECT.one.from(MyShoppingCart)
-            .where({ createdBy: user, status: 'ACTIVE' });
-        
-        if (!cart) {
-            const result = await INSERT.into(MyShoppingCart).entries({
-                status: 'ACTIVE',
-                createdBy: user
-            });
-            cart = await SELECT.one.from(MyShoppingCart)
-            .where({ createdBy: user, status: 'ACTIVE' });
-        }
-        
-        return cart;
-    };
-
-    // Helper function to calculate cart totals
-    const calculateCartTotals = async (cartId) => {
-        const cartItems = await SELECT.from(MyShoppingCartItems)
-            .columns('quantity', 'book_ID')
-            .where({ cart_ID: cartId });
-        
-        let totalItems = 0;
-        let totalAmount = 0;
-        
-        for (const item of cartItems) {
-            const book = await SELECT.one.from(Books).where({ ID: item.book_ID });
-            if (book) {
-                totalItems += item.quantity;
-                totalAmount += book.price * item.quantity;
-            }
-        }
-        
-        return {
-            cartItemCount: totalItems,
-            cartTotal: Math.round(totalAmount * 100) / 100
-        };
-    };
-
-    // Action: Add to Cart (bound to Books entity)
-    this.on('addToCart', 'Books', async (req) => {
-        const { quantity } = req.data;
-        const bookId = req.params[0].ID; // The book ID comes from the entity context
-        const user = req.user.id;
-        
-        // Validate input
-        if (!bookId || !quantity) {
-            req.error(400, 'Book ID and quantity are required');
-            return;
-        }
-        
-        if (quantity < 1 || quantity > 99) {
-            req.error(400, 'Quantity must be between 1 and 99');
-            return;
-        }
-        
-        // Check if book exists and has sufficient stock
-        const book = await SELECT.one.from(Books).where({ ID: bookId });
-        if (!book) {
-            req.error(404, `Book with ID ${bookId} not found`);
-            return;
-        }
-        
-        if (book.stock < quantity) {
-            req.error(400, `Insufficient stock for book "${book.title}". Available: ${book.stock}, Requested: ${quantity}`);
-            return;
-        }
-        
-        // Get or create user's cart
-        const cart = await getOrCreateCart(user);
-        
-        // Check if book is already in cart
-        const existingItem = await SELECT.one.from(MyShoppingCartItems)
-            .where({ cart_ID: cart.ID, book_ID: bookId });
-        
-        let message;
-        
-        if (existingItem) {
-            // Update existing item quantity
-            const newQuantity = existingItem.quantity + quantity;
-            
-            if (newQuantity > book.stock) {
-                req.error(400, `Cannot add ${quantity} more. Total would exceed available stock of ${book.stock}`);
-                return;
-            }
-            
-            if (newQuantity > 99) {
-                req.error(400, 'Maximum quantity per item is 99');
-                return;
-            }
-            
-            await UPDATE(MyShoppingCartItems)
-                .where({ ID: existingItem.ID })
-                .with({ quantity: newQuantity });
-            
-            message = `Cart updated - "${book.title}" quantity increased to ${newQuantity}`;
-        } else {
-            // Add new item to cart
-            await INSERT.into(MyShoppingCartItems).entries({
-                cart_ID: cart.ID,
-                book_ID: book.ID,
-                quantity,
-                createdBy: user
-            });
-            
-            message = 'Book added to cart successfully';
-        }
-        
-        // Calculate cart totals
-        const totals = await calculateCartTotals(cart.ID);
-        
-        return {
-            success: true,
-            message,
-            cartItemCount: totals.cartItemCount,
-            cartTotal: totals.cartTotal
-        };
-    });
+    // Note: addToCart handler moved to CartHandlers.js and registered above
 
     // Action: Update Cart Item (bound to MyShoppingCartItems)
     this.on('updateCartItem', 'MyShoppingCartItems', async (req) => {
@@ -675,7 +561,7 @@ module.exports = cds.service.impl(async function() {
             .with({ quantity });
         
         // Calculate cart totals
-        const totals = await calculateCartTotals(cartItem.cart_ID);
+        const totals = await CartUtils.calculateCartTotals(cartItem.cart_ID, this.entities);
         
         return {
             success: true,
@@ -710,7 +596,7 @@ module.exports = cds.service.impl(async function() {
         await DELETE.from(MyShoppingCartItems).where({ ID: itemId });
         
         // Calculate cart totals
-        const totals = await calculateCartTotals(cartItem.cart_ID);
+        const totals = await CartUtils.calculateCartTotals(cartItem.cart_ID, this.entities);
         
         return {
             success: true,
@@ -904,7 +790,7 @@ module.exports = cds.service.impl(async function() {
 
         for (const cart of results) {
             if (cart) {
-                const totals = await calculateCartTotals(cart.ID);
+                const totals = await CartUtils.calculateCartTotals(cart.ID, this.entities);
                 cart.totalItems = totals.cartItemCount;
                 cart.totalAmount = totals.cartTotal;
             }
