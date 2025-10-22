@@ -11,6 +11,7 @@ target/
 dist/
 db/src/
 db/undeploy.json
+Makefile*
 
 
 # Web IDE, App Studio
