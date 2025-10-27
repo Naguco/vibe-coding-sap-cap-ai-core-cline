@@ -55,10 +55,26 @@ modules:
           artifacts:
             - customer-shopping-ui.zip
           target-path: app/
+        - name: bookstoreappaiadminmanagementui
+          artifacts:
+            - admin-management-ui.zip
+          target-path: app/
 
   - name: bookstoreappaicustomershoppingui
     type: html5
     path: app/customer-shopping-ui
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm ci
+        - npm run build
+      supported-platforms:
+        []
+
+  - name: bookstoreappaiadminmanagementui
+    type: html5
+    path: app/admin-management-ui
     build-parameters:
       build-result: dist
       builder: custom

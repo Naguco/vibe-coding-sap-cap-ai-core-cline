@@ -217,6 +217,8 @@ annotate service.Books with {
     author @(
         title : 'Author',
         Common.Label : 'Author',
+        Common.Text : author.name,
+        Common.TextArrangement : #TextOnly,
         Common.ValueList : {
             $Type : 'Common.ValueListType',
             CollectionPath : 'Authors',
@@ -251,3 +253,178 @@ annotate service.Books with {
     modifiedAt @UI.Hidden : true;
     modifiedBy @UI.Hidden : true;
 };
+
+// Enable CRUD operations for Authors entity
+annotate service.Authors with @(
+    Capabilities.InsertRestrictions.Insertable : true,
+    Capabilities.UpdateRestrictions.Updatable : true,
+    Capabilities.DeleteRestrictions.Deletable : true,
+);
+
+// Enhanced Authors entity annotations for admin management
+annotate service.Authors with @(
+    UI.HeaderInfo : {
+        $Type : 'UI.HeaderInfoType',
+        TypeName : 'Author',
+        TypeNamePlural : 'Authors',
+        Title : {
+            $Type : 'UI.DataField',
+            Value : name,
+        },
+        Description : {
+            $Type : 'UI.DataField',
+            Value : nationality,
+        },
+    },
+    UI.SelectionFields : [
+        name,
+        nationality,
+        birthDate,
+    ],
+    UI.LineItem : [
+        {
+            $Type : 'UI.DataField',
+            Label : 'Name',
+            Value : name,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'Nationality',
+            Value : nationality,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'Birth Date',
+            Value : birthDate,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'Website',
+            Value : website,
+        },
+    ],
+    UI.Facets : [
+        {
+            $Type : 'UI.ReferenceFacet',
+            ID : 'BasicInfoFacet',
+            Label : 'Basic Information',
+            Target : '@UI.FieldGroup#BasicInfo',
+        },
+        {
+            $Type : 'UI.ReferenceFacet',
+            ID : 'BiographyFacet',
+            Label : 'Biography & Details',
+            Target : '@UI.FieldGroup#BiographyInfo',
+        },
+        {
+            $Type : 'UI.ReferenceFacet',
+            ID : 'BooksListFacet',
+            Label : 'Published Books',
+            Target : 'books/@UI.LineItem',
+        },
+    ],
+    UI.FieldGroup #BasicInfo : {
+        $Type : 'UI.FieldGroupType',
+        Data : [
+            {
+                $Type : 'UI.DataField',
+                Label : 'Name',
+                Value : name,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'Birth Date',
+                Value : birthDate,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'Nationality',
+                Value : nationality,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'Website',
+                Value : website,
+            },
+        ],
+    },
+    UI.FieldGroup #BiographyInfo : {
+        $Type : 'UI.FieldGroupType',
+        Data : [
+            {
+                $Type : 'UI.DataField',
+                Label : 'Biography',
+                Value : biography,
+            },
+        ],
+    },
+);
+
+// Field-level annotations for Authors for better user experience
+annotate service.Authors with {
+    ID @(
+        UI.Hidden : true,
+        Core.Computed : true,
+    );
+    name @(
+        title : 'Author Name',
+        Common.Label : 'Name',
+        UI.Placeholder : 'Enter author name...',
+    );
+    biography @(
+        title : 'Biography',
+        Common.Label : 'Biography',
+        UI.MultiLineText : true,
+        UI.Placeholder : 'Enter author biography...',
+    );
+    birthDate @(
+        title : 'Birth Date',
+        Common.Label : 'Birth Date',
+    );
+    nationality @(
+        title : 'Nationality',
+        Common.Label : 'Nationality',
+        UI.Placeholder : 'Enter nationality...',
+    );
+    website @(
+        title : 'Website',
+        Common.Label : 'Website',
+        UI.Placeholder : 'https://author-website.com',
+    );
+    // Computed fields should be hidden in create/edit forms
+    createdAt @UI.Hidden : true;
+    createdBy @UI.Hidden : true;
+    modifiedAt @UI.Hidden : true;
+    modifiedBy @UI.Hidden : true;
+};
+
+// Configure the books association display in Authors object page
+annotate service.Authors.books with @(
+    UI.LineItem : [
+        {
+            $Type : 'UI.DataField',
+            Label : 'Title',
+            Value : title,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'ISBN',
+            Value : isbn,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'Published Date',
+            Value : publishedDate,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'Price',
+            Value : price,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'Stock',
+            Value : stock,
+        },
+    ],
+);

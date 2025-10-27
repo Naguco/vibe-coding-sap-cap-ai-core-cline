@@ -17,7 +17,7 @@
     },
     "dataSources": {
       "mainService": {
-        "uri": "/odata/v4/admin/",
+        "uri": "odata/v4/admin/",
         "type": "OData",
         "settings": {
           "annotations": [],
@@ -92,6 +92,16 @@
           "pattern": "Books({key}):?query:",
           "name": "BooksObjectPage",
           "target": "BooksObjectPage"
+        },
+        {
+          "pattern": "Authors:?query:",
+          "name": "AuthorsList",
+          "target": "AuthorsList"
+        },
+        {
+          "pattern": "Authors({key}):?query:",
+          "name": "AuthorsObjectPage",
+          "target": "AuthorsObjectPage"
         }
       ],
       "targets": {
@@ -117,6 +127,18 @@
                   }
                 }
               },
+              "content": {
+                "header": {
+                  "actions": {
+                    "viewAuthors": {
+                      "press": "bookstore.admin.adminmanagementui.ext.ViewAuthorsAction.onPress",
+                      "visible": true,
+                      "enabled": true,
+                      "text": "{i18n>viewAuthorsButton}"
+                    }
+                  }
+                }
+              },
               "initialLoad": true
             }
           }
@@ -129,6 +151,43 @@
             "settings": {
               "editableHeaderContent": false,
               "contextPath": "/Books"
+            }
+          }
+        },
+        "AuthorsList": {
+          "type": "Component",
+          "id": "AuthorsList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "contextPath": "/Authors",
+              "variantManagement": "Page",
+              "navigation": {
+                "Authors": {
+                  "detail": {
+                    "route": "AuthorsObjectPage"
+                  }
+                }
+              },
+              "controlConfiguration": {
+                "@com.sap.vocabularies.UI.v1.LineItem": {
+                  "tableSettings": {
+                    "type": "ResponsiveTable"
+                  }
+                }
+              },
+              "initialLoad": true
+            }
+          }
+        },
+        "AuthorsObjectPage": {
+          "type": "Component",
+          "id": "AuthorsObjectPage",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": {
+            "settings": {
+              "editableHeaderContent": false,
+              "contextPath": "/Authors"
             }
           }
         }
