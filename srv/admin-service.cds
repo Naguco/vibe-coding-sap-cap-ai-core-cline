@@ -1,4 +1,5 @@
 using bookstore from '../db/data-model';
+using { Suppliers as BPSuppliers, SupplierDetails as BPSupplierDetails } from './external/business-partner-projections';
 
 service AdminService {
   
@@ -32,6 +33,13 @@ service AdminService {
   entity BooksWithStock as projection on bookstore.BooksWithStock;
   entity OrderSummary as projection on bookstore.OrderSummary;
   entity PopularBooks as projection on bookstore.PopularBooks;
+  
+  // Business Partner Integration - Supplier management (read-only from S/4HANA)
+  @readonly
+  entity Suppliers as projection on BPSuppliers;
+  
+  @readonly
+  entity SupplierDetails as projection on BPSupplierDetails;
   
   // Admin actions for discount management
   action activateDiscount(discountId: UUID) returns String;
