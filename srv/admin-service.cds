@@ -4,8 +4,13 @@ service AdminService {
   
   // Full CRUD access to core entities - these are the primary redirection targets
   @cds.redirection.target
+  @odata.draft.enabled
   entity Books as projection on bookstore.Books;
+  
+  @odata.draft.enabled
   entity Authors as projection on bookstore.Authors;
+  
+  @odata.draft.enabled
   entity Categories as projection on bookstore.Categories;
   
   // Full access to transactional entities - these are the primary redirection targets
