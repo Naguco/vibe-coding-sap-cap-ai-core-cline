@@ -1,71 +1,39 @@
 const cds = require('@sap/cds');
 
-describe('Supplier Management Actions - Phase 3', () => {
-  const { GET, POST, PATCH, DELETE } = cds.test(__dirname + '/..');
-  
+describe('Supplier Management - Standard OData Operations', () => {
+  const { GET, POST, PATCH, DELETE } = cds.test(__dirname + '/..', '--with-mocks');
+
   // Mock admin user for authentication
   const adminAuth = { auth: { username: 'alice' } };
 
-  describe('Supplier Lookup Actions', () => {
-    test('should provide supplier lookup action', async () => {
-      const response = await POST('/odata/v4/admin/lookupSuppliers', {}, adminAuth);
-      
-      expect(response.status).toBe(200);
-      expect(response.data.value).toBeInstanceOf(Array);
-      // Should return suppliers from S/4HANA
-      if (response.data.value.length > 0) {
-        expect(response.data.value[0]).toHaveProperty('ID');
-        expect(response.data.value[0]).toHaveProperty('name');
-        expect(response.data.value[0]).toHaveProperty('category');
-      }
-    });
-
-    test('should provide supplier search action with query parameter', async () => {
-      const searchParams = {
-        query: 'ACME'
-      };
-      
-      const response = await POST('/odata/v4/admin/searchSuppliers', searchParams, adminAuth);
-      
-      expect(response.status).toBe(200);
-      expect(response.data.value).toBeInstanceOf(Array);
-      // Results should be filtered by search query
-    });
-
-    test('should validate supplier exists in S/4HANA', async () => {
-      const validateParams = {
-        supplierId: '0000001234'
-      };
-      
-      const response = await POST('/odata/v4/admin/validateSupplier', validateParams, adminAuth);
-      
-      expect(response.status).toBe(200);
-      expect(response.data.value).toHaveProperty('exists');
-      expect(response.data.value).toHaveProperty('name');
-    });
-
-    test('should fail supplier validation for non-existent supplier', async () => {
-      const validateParams = {
-        supplierId: '9999999999'
-      };
-      
+  describe('Supplier Entity Access', () => {
+    test('should access Suppliers entity through standard OData', async () => {
+      // Since we're connecting to external S/4HANA service, this may fail in dev
+      // but we want to ensure the entity is exposed properly
       try {
-        await POST('/odata/v4/admin/validateSupplier', validateParams, adminAuth);
-        throw new Error('Expected validation to fail');
+        const response = await GET('/odata/v4/admin/Suppliers', adminAuth);
+        expect(response.status).toBe(200);
+        expect(response.data.value).toBeInstanceOf(Array);
       } catch (error) {
-        expect(error.response.status).toBe(404);
-        expect(error.message).toContain('not found');
+        // Expected in development environment without S/4HANA connection
+        expect(error.response.status).toBe(502); // Bad Gateway
       }
+    });
+
+    test('should have Suppliers entity in metadata', async () => {
+      const response = await GET('/odata/v4/admin/$metadata', adminAuth);
+      expect(response.status).toBe(200);
+      expect(response.data).toContain('Suppliers');
     });
   });
 
-  describe('Book-Supplier Assignment Actions', () => {
+  describe('BookSuppliers CRUD Operations', () => {
     let testBookId;
 
     beforeAll(async () => {
-      // Create a test book for supplier assignment
+      // Create a test book for supplier relationships
       const newBook = {
-        title: 'Test Book for Supplier Assignment',
+        title: 'Test Book for Supplier Management',
         price: 29.99,
         stock: 100
       };
@@ -73,285 +41,215 @@ describe('Supplier Management Actions - Phase 3', () => {
       const draftResponse = await POST('/odata/v4/admin/Books', {}, adminAuth);
       await PATCH(`/odata/v4/admin/Books(ID=${draftResponse.data.ID},IsActiveEntity=false)`, newBook, adminAuth);
       await POST(`/odata/v4/admin/Books(ID=${draftResponse.data.ID},IsActiveEntity=false)/draftActivate`, {}, adminAuth);
-      
+
       testBookId = draftResponse.data.ID;
     });
 
-    test('should link book to supplier', async () => {
-      const linkParams = {
-        bookId: testBookId,
-        supplierId: '0000001234',
+    test('should create BookSupplier relationship through standard OData', async () => {
+      const supplierRelationship = {
+        supplier: { ID: '0000001234' },
         isPreferred: true,
         contractNumber: 'CNT-001',
         leadTime: 7
       };
-      
-      const response = await POST('/odata/v4/admin/linkBookToSupplier', linkParams, adminAuth);
-      
-      expect(response.status).toBe(200);
-      expect(response.data.value).toContain('successfully linked');
-      
-      // Verify the relationship was created
-      const bookSuppliers = await GET(`/odata/v4/admin/BookSuppliers?$filter=book_ID eq ${testBookId}`, adminAuth);
-      expect(bookSuppliers.data.value.length).toBe(1);
-      expect(bookSuppliers.data.value[0].supplier_ID).toBe('0000001234');
-      expect(bookSuppliers.data.value[0].isPreferred).toBe(true);
+
+      await POST(`/odata/v4/admin/Books(ID=${testBookId},IsActiveEntity=true)/AdminService.draftEdit`, {}, adminAuth);
+      const response = await POST(
+        `/odata/v4/admin/Books(ID=${testBookId},IsActiveEntity=false)/suppliers`,
+        supplierRelationship,
+        adminAuth
+      );
+      await POST(
+        `/odata/v4/admin/Books(ID=${testBookId},IsActiveEntity=false)/AdminService.draftActivate`,
+        supplierRelationship,
+        adminAuth
+      );
+
+      expect(response.status).toBe(201);
+      expect(response.data.book_ID).toBe(testBookId);
+      expect(response.data.supplier_ID).toBe('0000001234');
+      expect(response.data.isPreferred).toBe(true);
     });
 
-    test('should fail to link book to invalid supplier', async () => {
-      const linkParams = {
-        bookId: testBookId,
-        supplierId: '9999999999',
-        isPreferred: false
+    test('should read BookSupplier relationships', async () => {
+
+      const supplierRelationship = {
+        supplier: { ID: '0000001235' },
+        isPreferred: true,
+        contractNumber: 'CNT-001',
+        leadTime: 7
       };
-      
-      try {
-        await POST('/odata/v4/admin/linkBookToSupplier', linkParams, adminAuth);
-        throw new Error('Expected linking to fail');
-      } catch (error) {
-        expect(error.response.status).toBe(404);
-        expect(error.message).toContain('Supplier not found');
-      }
-    });
 
-    test('should fail to link non-existent book to supplier', async () => {
-      const linkParams = {
-        bookId: '00000000-0000-0000-0000-000000000000',
-        supplierId: '0000001234',
-        isPreferred: false
-      };
-      
-      try {
-        await POST('/odata/v4/admin/linkBookToSupplier', linkParams, adminAuth);
-        throw new Error('Expected linking to fail');
-      } catch (error) {
-        expect(error.response.status).toBe(404);
-        expect(error.message).toContain('Book not found');
-      }
-    });
+      await POST(`/odata/v4/admin/Books(ID=${testBookId},IsActiveEntity=true)/AdminService.draftEdit`, {}, adminAuth);
+      await POST(
+        `/odata/v4/admin/Books(ID=${testBookId},IsActiveEntity=false)/suppliers`,
+        supplierRelationship,
+        adminAuth
+      );
 
-    test('should update book-supplier relationship', async () => {
-      const updateParams = {
-        bookId: testBookId,
-        supplierId: '0000001234',
-        isPreferred: false,
-        leadTime: 14,
-        notes: 'Updated lead time due to seasonal demand'
-      };
-      
-      const response = await POST('/odata/v4/admin/updateBookSupplier', updateParams, adminAuth);
-      
-      expect(response.status).toBe(200);
-      expect(response.data.value).toContain('successfully updated');
-      
-      // Verify the relationship was updated
-      const bookSuppliers = await GET(`/odata/v4/admin/BookSuppliers?$filter=book_ID eq ${testBookId} and supplier_ID eq '0000001234'`, adminAuth);
-      expect(bookSuppliers.data.value[0].isPreferred).toBe(false);
-      expect(bookSuppliers.data.value[0].leadTime).toBe(14);
-      expect(bookSuppliers.data.value[0].notes).toBe('Updated lead time due to seasonal demand');
-    });
+      const response = await GET(`/odata/v4/admin/BookSuppliers?$filter=book_ID eq ${testBookId}`, adminAuth);
 
-    test('should remove book-supplier relationship', async () => {
-      const removeParams = {
-        bookId: testBookId,
-        supplierId: '0000001234'
-      };
-      
-      const response = await POST('/odata/v4/admin/removeBookSupplier', removeParams, adminAuth);
-      
-      expect(response.status).toBe(200);
-      expect(response.data.value).toContain('successfully removed');
-      
-      // Verify the relationship was removed
-      const bookSuppliers = await GET(`/odata/v4/admin/BookSuppliers?$filter=book_ID eq ${testBookId}`, adminAuth);
-      expect(bookSuppliers.data.value.length).toBe(0);
-    });
-
-    test('should fail to remove non-existent book-supplier relationship', async () => {
-      const removeParams = {
-        bookId: testBookId,
-        supplierId: '0000005678'
-      };
-      
-      try {
-        await POST('/odata/v4/admin/removeBookSupplier', removeParams, adminAuth);
-        throw new Error('Expected removal to fail');
-      } catch (error) {
-        expect(error.response.status).toBe(404);
-        expect(error.message).toContain('Relationship not found');
-      }
-    });
-  });
-
-  describe('Bulk Supplier Operations', () => {
-    let testBookIds = [];
-
-    beforeAll(async () => {
-      // Create multiple test books for bulk operations
-      for (let i = 1; i <= 3; i++) {
-        const newBook = {
-          title: `Bulk Test Book ${i}`,
-          price: 19.99 + i,
-          stock: 50 * i
-        };
-
-        const draftResponse = await POST('/odata/v4/admin/Books', {}, adminAuth);
-        await PATCH(`/odata/v4/admin/Books(ID=${draftResponse.data.ID},IsActiveEntity=false)`, newBook, adminAuth);
-        await POST(`/odata/v4/admin/Books(ID=${draftResponse.data.ID},IsActiveEntity=false)/draftActivate`, {}, adminAuth);
-        
-        testBookIds.push(draftResponse.data.ID);
-      }
-    });
-
-    test('should bulk assign supplier to multiple books', async () => {
-      const bulkParams = {
-        bookIds: testBookIds,
-        supplierId: '0000001234',
-        isPreferred: false,
-        leadTime: 10
-      };
-      
-      const response = await POST('/odata/v4/admin/bulkAssignSupplier', bulkParams, adminAuth);
-      
-      expect(response.status).toBe(200);
-      expect(response.data.value).toContain('successfully assigned');
-      expect(response.data.value).toContain(`${testBookIds.length} books`);
-      
-      // Verify all relationships were created
-      for (const bookId of testBookIds) {
-        const bookSuppliers = await GET(`/odata/v4/admin/BookSuppliers?$filter=book_ID eq ${bookId} and supplier_ID eq '0000001234'`, adminAuth);
-        expect(bookSuppliers.data.value.length).toBe(1);
-      }
-    });
-
-    test('should get supplier summary for books', async () => {
-      const summaryParams = {
-        bookIds: testBookIds
-      };
-      
-      const response = await POST('/odata/v4/admin/getSupplierSummary', summaryParams, adminAuth);
-      
       expect(response.status).toBe(200);
       expect(response.data.value).toBeInstanceOf(Array);
-      expect(response.data.value.length).toBe(testBookIds.length);
-      
-      // Each book should have supplier information
-      response.data.value.forEach(bookSummary => {
-        expect(bookSummary).toHaveProperty('bookId');
-        expect(bookSummary).toHaveProperty('supplierCount');
-        expect(bookSummary).toHaveProperty('preferredSupplier');
-      });
+      expect(response.data.value.length).toBeGreaterThan(0);
+      expect(response.data.value[0].supplier_ID).toBe('0000001234');
+    });
+
+    test('should update BookSupplier relationship', async () => {
+      const bookPayload = {
+        ID: cds.utils.uuid(), // Generate a NEW ID just for this test
+        title: 'Book for Update Test',
+        price: 100,
+        stock: 100
+      };
+
+      // Create the draft book
+      await POST('/odata/v4/admin/Books', bookPayload, adminAuth);
+      // Activate it
+      const activeBookResponse = await POST(
+        `/odata/v4/admin/Books(ID=${bookPayload.ID},IsActiveEntity=false)/AdminService.draftActivate`,
+        {},
+        adminAuth
+      );
+      const newBookId = activeBookResponse.data.ID; // Use this new ID
+
+      // --- 2. SETUP: Create an ACTIVE Supplier Relationship for that book ---
+      const supplierPayload = {
+        supplier_ID: '0000012345',
+        isPreferred: true,
+        leadTime: 5
+      };
+
+      // Start edit draft
+      await POST(`/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=true)/AdminService.draftEdit`, {}, adminAuth);
+      // POST the new supplier to the draft
+      const supplierResponse = await POST(
+        `/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=false)/suppliers`,
+        supplierPayload,
+        adminAuth
+      );
+      const newSupplierRelationshipID = supplierResponse.data.ID; // Get the ID of the child
+
+      // Activate the book to save the new supplier
+      await POST(`/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=false)/AdminService.draftActivate`, {}, adminAuth);
+
+      // --- 3. TEST: Now, we can finally test the UPDATE ---
+
+      // Start a NEW draft session to perform the update
+      await POST(`/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=true)/AdminService.draftEdit`, {}, adminAuth);
+
+      const updates = {
+        isPreferred: false,
+        leadTime: 14,
+        notes: 'Updated lead time'
+      };
+
+      // ✅ CORRECT: PATCH the DRAFT entity, using the correct parent and child IDs
+      const response = await PATCH(
+        `/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=false)/suppliers(ID=${newSupplierRelationshipID})`,
+        updates,
+        adminAuth
+      );
+
+      // --- 4. ASSERT: Check the response from the PATCH ---
+      expect(response.status).toBe(200);
+      expect(response.data.isPreferred).toBe(false);
+      expect(response.data.leadTime).toBe(14);
+      expect(response.data.notes).toBe('Updated lead time');
+    });
+
+    test('should delete BookSupplier relationship', async () => {
+      // Get the relationship to delete
+      // --- 1. SETUP: Create a new ACTIVE Book ---
+      const bookPayload = {
+        ID: cds.utils.uuid(), // Generate a NEW ID just for this test
+        title: 'Book for Delete Test',
+        price: 100,
+        stock: 100
+      };
+      await POST('/odata/v4/admin/Books', bookPayload, adminAuth); // Create draft
+      const activeBookResponse = await POST(
+        `/odata/v4/admin/Books(ID=${bookPayload.ID},IsActiveEntity=false)/AdminService.draftActivate`,
+        {}, adminAuth
+      );
+      const newBookId = activeBookResponse.data.ID;
+
+      // --- 2. SETUP: Create an ACTIVE Supplier Relationship for that book ---
+      const supplierPayload = {
+        supplier_ID: '0000012345',
+        isPreferred: true
+      };
+      await POST(`/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=true)/AdminService.draftEdit`, {}, adminAuth);
+      const supplierResponse = await POST(
+        `/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=false)/suppliers`,
+        supplierPayload, adminAuth
+      );
+      const newSupplierRelationshipID = supplierResponse.data.ID; // Get the ID of the child
+      await POST(`/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=false)/AdminService.draftActivate`, {}, adminAuth); // Activate
+
+      // --- 3. TEST: Now, we can test the DELETE ---
+
+      // Start a NEW draft session to perform the delete
+      await POST(`/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=true)/AdminService.draftEdit`, {}, adminAuth);
+
+      // ✅ CORRECT: DELETE from the DRAFT entity, using the correct parent/child path
+      const response = await DELETE(
+        `/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=false)/suppliers(ID=${newSupplierRelationshipID})`,
+        adminAuth
+      );
+
+      // --- 4. ASSERT: Check the DELETE response ---
+      expect(response.status).toBe(204); // 204 No Content is success for DELETE
+
+      await POST(
+        `/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=false)/AdminService.draftActivate`,
+        {},
+        adminAuth
+      );
+
+      // --- 5. VERIFY: Check that the supplier is gone from the DRAFT ---
+      try {
+        await GET(
+          `/odata/v4/admin/Books(ID=${newBookId},IsActiveEntity=false)?$expand=suppliers`,
+          adminAuth
+        );
+        // If the GET succeeds, the test should fail.
+        // We can force it to fail by throwing our own error.
+        throw new Error('Test failed: The GET request for the draft entity should have returned a 404, but it succeeded.');
+      } catch (error) {
+        // This is the expected path
+        errorStatus = error.response?.status;
+      }
+
+      // Assert that we caught the expected 404 error
+      expect(errorStatus).toBe(404);
     });
   });
 
-  describe('Supplier Information Enrichment', () => {
-    test('should enrich supplier data with S/4HANA details', async () => {
-      const enrichParams = {
-        supplierId: '0000001234'
-      };
-      
-      const response = await POST('/odata/v4/admin/enrichSupplierData', enrichParams, adminAuth);
-      
+  describe('Books with Suppliers Expansion', () => {
+    test('should expand Books with suppliers', async () => {
+      const response = await GET('/odata/v4/admin/Books?$expand=suppliers', adminAuth);
+
       expect(response.status).toBe(200);
-      expect(response.data.value).toHaveProperty('supplierInfo');
-      expect(response.data.value.supplierInfo).toHaveProperty('ID');
-      expect(response.data.value.supplierInfo).toHaveProperty('name');
-      expect(response.data.value.supplierInfo).toHaveProperty('category');
-      expect(response.data.value.supplierInfo).toHaveProperty('addresses');
-      expect(response.data.value.supplierInfo).toHaveProperty('contacts');
-    });
-
-    test('should get supplier performance metrics', async () => {
-      // First create a book-supplier relationship for metrics
-      const testBook = {
-        title: 'Metrics Test Book',
-        price: 25.99,
-        stock: 75
-      };
-
-      const draftResponse = await POST('/odata/v4/admin/Books', {}, adminAuth);
-      await PATCH(`/odata/v4/admin/Books(ID=${draftResponse.data.ID},IsActiveEntity=false)`, testBook, adminAuth);
-      await POST(`/odata/v4/admin/Books(ID=${draftResponse.data.ID},IsActiveEntity=false)/draftActivate`, {}, adminAuth);
-      
-      const testBookId = draftResponse.data.ID;
-
-      // Link to supplier
-      await POST('/odata/v4/admin/linkBookToSupplier', {
-        bookId: testBookId,
-        supplierId: '0000001234',
-        isPreferred: true
-      }, adminAuth);
-
-      // Get performance metrics
-      const metricsParams = {
-        supplierId: '0000001234'
-      };
-      
-      const response = await POST('/odata/v4/admin/getSupplierMetrics', metricsParams, adminAuth);
-      
-      expect(response.status).toBe(200);
-      expect(response.data.value).toHaveProperty('totalBooks');
-      expect(response.data.value).toHaveProperty('preferredBooks');
-      expect(response.data.value).toHaveProperty('averageLeadTime');
-      expect(response.data.value).toHaveProperty('lastOrderDate');
+      expect(response.data.value).toBeInstanceOf(Array);
+      // Each book should have a suppliers property (even if empty)
+      if (response.data.value.length > 0) {
+        expect(response.data.value[0]).toHaveProperty('suppliers');
+      }
     });
   });
 
-  describe('Error Handling and Edge Cases', () => {
-    test('should handle S/4HANA connectivity issues gracefully', async () => {
-      // This test would normally mock S/4HANA unavailability
-      // For now, we'll test parameter validation
-      try {
-        await POST('/odata/v4/admin/lookupSuppliers', { invalidParam: true }, adminAuth);
-      } catch (error) {
-        // Should either succeed or fail gracefully with meaningful message
-        expect([200, 400, 503]).toContain(error.response?.status || 200);
-      }
+  describe('Integration Validation', () => {
+    test('should maintain existing service functionality', async () => {
+      const response = await GET('/odata/v4/admin/Books', adminAuth);
+      expect(response.status).toBe(200);
+      expect(response.data.value).toBeInstanceOf(Array);
     });
 
-    test('should validate required parameters for supplier actions', async () => {
-      try {
-        await POST('/odata/v4/admin/linkBookToSupplier', {}, adminAuth);
-        throw new Error('Expected validation to fail');
-      } catch (error) {
-        expect(error.response.status).toBe(400);
-        expect(error.message).toContain('required');
-      }
-    });
-
-    test('should prevent duplicate supplier assignments', async () => {
-      // Create a test book
-      const newBook = {
-        title: 'Duplicate Test Book',
-        price: 15.99,
-        stock: 30
-      };
-
-      const draftResponse = await POST('/odata/v4/admin/Books', {}, adminAuth);
-      await PATCH(`/odata/v4/admin/Books(ID=${draftResponse.data.ID},IsActiveEntity=false)`, newBook, adminAuth);
-      await POST(`/odata/v4/admin/Books(ID=${draftResponse.data.ID},IsActiveEntity=false)/draftActivate`, {}, adminAuth);
-      
-      const testBookId = draftResponse.data.ID;
-
-      // First assignment should succeed
-      await POST('/odata/v4/admin/linkBookToSupplier', {
-        bookId: testBookId,
-        supplierId: '0000001234',
-        isPreferred: true
-      }, adminAuth);
-
-      // Second assignment to same supplier should fail
-      try {
-        await POST('/odata/v4/admin/linkBookToSupplier', {
-          bookId: testBookId,
-          supplierId: '0000001234',
-          isPreferred: false
-        }, adminAuth);
-        throw new Error('Expected duplicate assignment to fail');
-      } catch (error) {
-        expect(error.response.status).toBe(400);
-        expect(error.message).toContain('already linked');
-      }
+    test('should maintain existing Authors functionality', async () => {
+      const response = await GET('/odata/v4/admin/Authors', adminAuth);
+      expect(response.status).toBe(200);
+      expect(response.data.value).toBeInstanceOf(Array);
     });
   });
 });

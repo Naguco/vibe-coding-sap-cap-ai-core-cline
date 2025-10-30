@@ -59,6 +59,25 @@ modules:
           artifacts:
             - admin-management-ui.zip
           target-path: app/
+    parameters:
+      config:
+        HTML5Runtime_enabled: true
+        init_data:
+          instance:
+            existing_destinations_policy: update
+            destinations:
+              - Name: srv-api
+                URL: ~{srv-api/srv-url}
+                Authentication: NoAuthentication
+                Type: HTTP
+                ProxyType: Internet
+                HTML5.ForwardAuthToken: true
+                HTML5.DynamicDestination: true
+              - Name: ui5
+                URL: https://ui5.sap.com
+                Authentication: NoAuthentication
+                Type: HTTP
+                ProxyType: Internet
 
   - name: bookstoreappaicustomershoppingui
     type: html5
@@ -110,7 +129,7 @@ modules:
               Authentication: OAuth2UserTokenExchange
               TokenServiceInstanceName: bookstore-app-ai-auth
               TokenServiceKeyName: bookstore-app-ai-auth-key
-              URL:  ~{srv-api/srv-url}
+              URL: ~{srv-api/srv-url}
               sap.cloud.service: bookstoreappai.service
             - Name: bookstore-app-ai-html5-repository
               ServiceInstanceName: bookstore-app-ai-html5-repo-host
@@ -129,6 +148,18 @@ resources:
       service: xsuaa
       service-plan: application
       path: ./xs-security.json
+      config:
+        xsappname: bookstore-app-ai-${org}-${space}
+        tenant-mode: dedicated
+        role-collections:
+          - name: 'admin (bookstore-app-ai ${org}-${space})'
+            description: 'generated'
+            role-template-references:
+              - '$XSAPPNAME.admin'
+          - name: 'customer (bookstore-app-ai ${org}-${space})'
+            description: 'generated'
+            role-template-references:
+              - '$XSAPPNAME.customer'
   - name: bookstore-app-ai-db
     type: com.sap.xs.hdi-container
     parameters:
@@ -150,6 +181,13 @@ resources:
                 Authentication: NoAuthentication
                 Type: HTTP
                 ProxyType: Internet
+    requires:
+      - name: srv-api
+        group: destinations
+        properties:
+          name: srv-api # must be used in xs-app.json as well
+          url: ~{srv-url}
+          forwardAuthToken: true
 
   - name: bookstore-app-ai-html5-repo-host
     type: org.cloudfoundry.managed-service

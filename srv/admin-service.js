@@ -1,7 +1,20 @@
 const cds = require('@sap/cds');
 
 module.exports = cds.service.impl(async function() {
-  const { Books, Authors, Categories, Orders, Returns, DiscountCodes } = this.entities;
+  const { Books, Authors, Categories, Orders, Returns, DiscountCodes, Suppliers, SupplierDetails } = this.entities;
+  
+  // Connect to the external Business Partner service
+  const bupa = await cds.connect.to('API_BUSINESS_PARTNER');
+  
+  // Delegate READ requests for Suppliers to the external service
+  this.on('READ', 'Suppliers', req => {
+    return bupa.run(req.query);
+  });
+  
+  // Delegate READ requests for SupplierDetails to the external service
+  this.on('READ', 'SupplierDetails', req => {
+    return bupa.run(req.query);
+  });
 
   // Books management with validation
   this.before('CREATE', 'Books', async (req) => {

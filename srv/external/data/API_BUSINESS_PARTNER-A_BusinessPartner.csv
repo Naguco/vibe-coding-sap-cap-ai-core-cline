@@ -1,0 +1,11 @@
+BusinessPartner;BusinessPartnerFullName;BusinessPartnerCategory;BusinessPartnerIsBlocked;CreationDate;LastChangeDate;OrganizationBPName1;OrganizationBPName2;SearchTerm1
+0000001234;ACME Publishing Supplies;2;false;2023-01-15;2024-10-15;ACME Publishing;Supplies Division;ACME
+0000001235;Global Book Distribution Ltd;2;false;2023-02-20;2024-09-10;Global Book Distribution;Europe;GLOBAL
+0000001236;Premium Paper Solutions;2;false;2023-03-10;2024-08-25;Premium Paper;Solutions;PREMIUM
+0000001237;Literary Logistics Corp;2;false;2023-04-05;2024-07-30;Literary Logistics;Corporate;LITERARY
+0000001238;Educational Resources Inc;2;false;2023-05-12;2024-06-15;Educational Resources;Incorporated;EDUCATIONAL
+0000001239;Academic Partners Group;2;false;2023-06-18;2024-05-20;Academic Partners;Group;ACADEMIC
+0000001240;International Book Services;2;true;2023-07-25;2024-04-10;International Book;Services;INTERNATIONAL
+0000001241;Scholastic Supply Chain;2;false;2023-08-30;2024-03-05;Scholastic Supply;Chain;SCHOLASTIC
+0000001242;Publishing Network Solutions;2;false;2023-09-14;2024-02-18;Publishing Network;Solutions;PUBLISHING
+0000001243;Book Distribution Partners;2;false;2023-10-22;2024-01-12;Book Distribution;Partners;DISTRIBUTION
