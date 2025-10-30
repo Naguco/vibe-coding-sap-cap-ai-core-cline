@@ -1,6 +1,7 @@
 namespace bookstore;
 
 using { managed, cuid } from '@sap/cds/common';
+using { Suppliers } from '../srv/external/business-partner-projections';
 
 //
 // Types and Enums
@@ -39,10 +40,10 @@ type DiscountType : String enum {
 
 entity Books : managed {
   key ID          : UUID;
-  title           : String(200) not null;
+  title           : String(200) not null @mandatory;
   isbn            : String(20);
   description     : String(1000);
-  price           : Decimal(10,2) not null;
+  price           : Decimal(10,2) not null @mandatory;
   stock           : Integer not null default 0;
   imageUrl        : String(500);
   publishedDate   : Date;
@@ -55,11 +56,12 @@ entity Books : managed {
   categories      : Association to many BookCategories on categories.book = $self;
   orderItems      : Association to many OrderItems on orderItems.book = $self;
   reviews         : Association to many Reviews on reviews.book = $self;
+  suppliers       : Composition of many BookSuppliers on suppliers.book = $self;
 }
 
 entity Authors : managed {
   key ID          : UUID;
-  name            : String(100) not null;
+  name            : String(100) not null @mandatory;
   biography       : String(2000);
   birthDate       : Date;
   nationality     : String(50);
@@ -71,7 +73,7 @@ entity Authors : managed {
 
 entity Categories : managed {
   key ID          : UUID;
-  name            : String(100) not null;
+  name            : String(100) not null @mandatory;
   description     : String(500);
   parentCategory  : Association to Categories;
   
@@ -81,12 +83,28 @@ entity Categories : managed {
 }
 
 //
-// Junction Table for Many-to-Many relationship
+// Junction Tables for Many-to-Many relationships
 //
 
 entity BookCategories : cuid {
   book            : Association to Books;
   category        : Association to Categories;
+}
+
+// Business Partner Integration - Junction table for Books-Suppliers relationship
+entity BookSuppliers : managed {
+  key ID          : UUID;
+  book            : Association to Books;
+  supplier        : Association to Suppliers; // Direct association to S/4HANA Suppliers
+  isActive        : Boolean default true;
+  isPreferred     : Boolean default false;
+  
+  // Business context
+  contractNumber  : String(50);
+  leadTime        : Integer; // days
+  minOrderQty     : Integer default 1;
+  lastOrderDate   : Date;
+  notes           : String(500);
 }
 
 //

@@ -25,6 +25,9 @@ service AdminService {
   // Junction table for many-to-many relationships
   entity BookCategories as projection on bookstore.BookCategories;
   
+  // Business Partner Integration - Book-Supplier relationships
+  entity BookSuppliers as projection on bookstore.BookSuppliers;
+  
   // Discount management - primary redirection target
   @cds.redirection.target
   entity DiscountCodes as projection on bookstore.DiscountCodes;

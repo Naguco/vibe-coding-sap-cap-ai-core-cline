@@ -40,11 +40,15 @@ describe('AdminService', () => {
         };
 
         try {
-          await POST('/odata/v4/admin/Books', invalidBook, adminAuth);
-          fail('Expected request to fail');
+          
+          let draftBook = await POST('/odata/v4/admin/Books', {}, adminAuth);
+          await PATCH(`/odata/v4/admin/Books(ID=${draftBook.data.ID},IsActiveEntity=false)`, invalidBook, adminAuth);
+          await POST(`/odata/v4/admin/Books(ID=${draftBook.data.ID},IsActiveEntity=false)/draftActivate`, {}, adminAuth);
+
+          throw new Error('Expected request to fail');
         } catch (error) {
           expect(error.response.status).toBe(400);
-          expect(error.message).toContain('Title is required');
+          expect(error.message).toContain('Value is required');
         }
       });
 
@@ -56,11 +60,15 @@ describe('AdminService', () => {
         };
 
         try {
-          await POST('/odata/v4/admin/Books', invalidBook, adminAuth);
-          fail('Expected request to fail');
+          
+          let draftBook = await POST('/odata/v4/admin/Books', {}, adminAuth);
+          await PATCH(`/odata/v4/admin/Books(ID=${draftBook.data.ID},IsActiveEntity=false)`, invalidBook, adminAuth);
+          await POST(`/odata/v4/admin/Books(ID=${draftBook.data.ID},IsActiveEntity=false)/draftActivate`, {}, adminAuth);
+
+          throw new Error('Expected request to fail');
         } catch (error) {
           expect(error.response.status).toBe(400);
-          expect(error.message).toContain('Price is required');
+          expect(error.message).toContain('Value is required');
         }
       });
     });
@@ -77,7 +85,8 @@ describe('AdminService', () => {
       test('should get a specific book by ID', async () => {
         const bookId = '550e8400-e29b-41d4-a716-446655442001'; // Harry Potter from sample data
         
-        const response = await GET(`/odata/v4/admin/Books(${bookId})`, adminAuth);
+        // For draft-enabled entities, we need to specify IsActiveEntity=true for active records
+        const response = await GET(`/odata/v4/admin/Books(ID=${bookId},IsActiveEntity=true)`, adminAuth);
         
         expect(response.status).toBe(200);
         expect(response.data.ID).toBe(bookId);
@@ -88,8 +97,8 @@ describe('AdminService', () => {
         const nonExistentId = '00000000-0000-0000-0000-000000000000';
         
         try {
-          await GET(`/odata/v4/admin/Books(${nonExistentId})`, adminAuth);
-          fail('Expected request to fail with 404');
+          await GET(`/odata/v4/admin/Books(ID=${nonExistentId},IsActiveEntity=true)`, adminAuth);
+          throw new Error('Expected request to fail with 404');
         } catch (error) {
           expect(error.response.status).toBe(404);
         }
@@ -104,7 +113,7 @@ describe('AdminService', () => {
           stock: 75
         };
 
-        const response = await PATCH(`/odata/v4/admin/Books(${bookId})`, updates, adminAuth);
+        const response = await PATCH(`/odata/v4/admin/Books(ID=${bookId},IsActiveEntity=true)`, updates, adminAuth);
         
         expect(response.status).toBe(200);
         expect(response.data.price).toBe(updates.price);
@@ -117,7 +126,7 @@ describe('AdminService', () => {
           description: 'Updated description for testing purposes'
         };
 
-        const response = await PATCH(`/odata/v4/admin/Books(${bookId})`, updates, adminAuth);
+        const response = await PATCH(`/odata/v4/admin/Books(ID=${bookId},IsActiveEntity=true)`, updates, adminAuth);
         
         expect(response.status).toBe(200);
         expect(response.data.description).toBe(updates.description);
@@ -130,8 +139,8 @@ describe('AdminService', () => {
         };
 
         try {
-          await PATCH(`/odata/v4/admin/Books(${bookId})`, invalidUpdates, adminAuth);
-          fail('Expected request to fail with 400');
+          await PATCH(`/odata/v4/admin/Books(ID=${bookId},IsActiveEntity=true)`, invalidUpdates, adminAuth);
+          throw new Error('Expected request to fail with 400');
         } catch (error) {
           expect(error.response.status).toBe(400);
         }
@@ -147,19 +156,20 @@ describe('AdminService', () => {
           stock: 10
         };
 
-        const createResponse = await POST('/odata/v4/admin/Books', newBook, adminAuth);
-        expect(createResponse.status).toBe(201);
+        const createResponse = await POST('/odata/v4/admin/Books', {}, adminAuth);
+        await PATCH(`/odata/v4/admin/Books(ID=${createResponse.data.ID},IsActiveEntity=false)`, newBook, adminAuth);
+        await POST(`/odata/v4/admin/Books(ID=${createResponse.data.ID},IsActiveEntity=false)/draftActivate`, {}, adminAuth);
         
         const bookId = createResponse.data.ID;
 
         // Now delete the book
-        const deleteResponse = await DELETE(`/odata/v4/admin/Books(${bookId})`, adminAuth);
+        const deleteResponse = await DELETE(`/odata/v4/admin/Books(ID=${bookId},IsActiveEntity=true)`, adminAuth);
         expect(deleteResponse.status).toBe(204);
 
         // Verify book is deleted
         try {
-          await GET(`/odata/v4/admin/Books(${bookId})`, adminAuth);
-          fail('Expected book to be deleted (404)');
+          await GET(`/odata/v4/admin/Books(ID=${bookId},IsActiveEntity=true)`, adminAuth);
+          throw new Error('Expected book to be deleted (404)');
         } catch (error) {
           expect(error.response.status).toBe(404);
         }
@@ -169,8 +179,8 @@ describe('AdminService', () => {
         const nonExistentId = '00000000-0000-0000-0000-000000000000';
         
         try {
-          await DELETE(`/odata/v4/admin/Books(${nonExistentId})`, adminAuth);
-          fail('Expected request to fail with 404');
+          await DELETE(`/odata/v4/admin/Books(ID=${nonExistentId},IsActiveEntity=true)`, adminAuth);
+          throw new Error('Expected request to fail with 404');
         } catch (error) {
           expect(error.response.status).toBe(404);
         }
@@ -207,11 +217,14 @@ describe('AdminService', () => {
         };
 
         try {
-          await POST('/odata/v4/admin/Authors', invalidAuthor, adminAuth);
-          fail('Expected request to fail');
+          let draftCreation = await POST('/odata/v4/admin/Authors', {}, adminAuth);
+          await PATCH(`/odata/v4/admin/Authors(ID=${draftCreation.data.ID},IsActiveEntity=false)`, invalidAuthor, adminAuth)
+          await POST(`/odata/v4/admin/Authors(ID=${draftCreation.data.ID},IsActiveEntity=false)/draftActivate`, {}, adminAuth)
+
+          throw new Error('Expected request to fail');
         } catch (error) {
           expect(error.response.status).toBe(400);
-          expect(error.message).toContain('Author name is required');
+          expect(error.message).toContain('Value is required');
         }
       });
     });
@@ -228,7 +241,7 @@ describe('AdminService', () => {
       test('should get a specific author by ID', async () => {
         const authorId = '550e8400-e29b-41d4-a716-446655440001'; // J.K. Rowling from sample data
         
-        const response = await GET(`/odata/v4/admin/Authors(${authorId})`, adminAuth);
+        const response = await GET(`/odata/v4/admin/Authors(ID=${authorId},IsActiveEntity=true)`, adminAuth);
         
         expect(response.status).toBe(200);
         expect(response.data.ID).toBe(authorId);
@@ -243,7 +256,7 @@ describe('AdminService', () => {
           biography: 'Updated biography for George Orwell'
         };
 
-        const response = await PATCH(`/odata/v4/admin/Authors(${authorId})`, updates, adminAuth);
+        const response = await PATCH(`/odata/v4/admin/Authors(ID=${authorId},IsActiveEntity=true)`, updates, adminAuth);
         
         expect(response.status).toBe(200);
         expect(response.data.biography).toBe(updates.biography);
@@ -258,19 +271,20 @@ describe('AdminService', () => {
           nationality: 'Test'
         };
 
-        const createResponse = await POST('/odata/v4/admin/Authors', newAuthor, adminAuth);
-        expect(createResponse.status).toBe(201);
+        const createResponse = await POST('/odata/v4/admin/Authors', {}, adminAuth);
+        await PATCH(`/odata/v4/admin/Authors(ID=${createResponse.data.ID},IsActiveEntity=false)`, newAuthor, adminAuth);
+        await POST(`/odata/v4/admin/Authors(ID=${createResponse.data.ID},IsActiveEntity=false)/draftActivate`, {}, adminAuth);
         
         const authorId = createResponse.data.ID;
 
         // Delete the author
-        const deleteResponse = await DELETE(`/odata/v4/admin/Authors(${authorId})`, adminAuth);
+        const deleteResponse = await DELETE(`/odata/v4/admin/Authors(ID=${authorId},IsActiveEntity=true)`, adminAuth);
         expect(deleteResponse.status).toBe(204);
 
         // Verify author is deleted
         try {
-          await GET(`/odata/v4/admin/Authors(${authorId})`, adminAuth);
-          fail('Expected author to be deleted (404)');
+          await GET(`/odata/v4/admin/Authors(ID=${authorId},IsActiveEntity=true)`, adminAuth);
+          throw new Error('Expected author to be deleted (404)');
         } catch (error) {
           expect(error.response.status).toBe(404);
         }
@@ -317,11 +331,13 @@ describe('AdminService', () => {
         };
 
         try {
-          await POST('/odata/v4/admin/Categories', invalidCategory, adminAuth);
-          fail('Expected request to fail');
+          let draftCreation = await POST('/odata/v4/admin/Categories', {}, adminAuth);
+          await PATCH(`/odata/v4/admin/Categories(ID=${ draftCreation.data.ID },IsActiveEntity=false)`, invalidCategory, adminAuth);
+          await POST(`/odata/v4/admin/Categories(ID=${ draftCreation.data.ID },IsActiveEntity=false)/draftActivate`, {}, adminAuth);
+          throw new Error('Expected request to fail');
         } catch (error) {
           expect(error.response.status).toBe(400);
-          expect(error.message).toContain('Category name is required');
+          expect(error.message).toContain('Value is required');
         }
       });
     });
@@ -338,7 +354,7 @@ describe('AdminService', () => {
       test('should get a specific category by ID', async () => {
         const categoryId = '550e8400-e29b-41d4-a716-446655441001'; // Fiction from sample data
         
-        const response = await GET(`/odata/v4/admin/Categories(${categoryId})`, adminAuth);
+        const response = await GET(`/odata/v4/admin/Categories(ID=${categoryId},IsActiveEntity=true)`, adminAuth);
         
         expect(response.status).toBe(200);
         expect(response.data.ID).toBe(categoryId);
@@ -353,7 +369,7 @@ describe('AdminService', () => {
           description: 'Updated description for Non-Fiction category'
         };
 
-        const response = await PATCH(`/odata/v4/admin/Categories(${categoryId})`, updates, adminAuth);
+        const response = await PATCH(`/odata/v4/admin/Categories(ID=${categoryId},IsActiveEntity=true)`, updates, adminAuth);
         
         expect(response.status).toBe(200);
         expect(response.data.description).toBe(updates.description);
@@ -368,19 +384,20 @@ describe('AdminService', () => {
           description: 'This will be deleted'
         };
 
-        const createResponse = await POST('/odata/v4/admin/Categories', newCategory, adminAuth);
-        expect(createResponse.status).toBe(201);
+        const createResponse = await POST('/odata/v4/admin/Categories', {}, adminAuth);
+        await PATCH(`/odata/v4/admin/Categories(ID=${createResponse.data.ID},IsActiveEntity=false)`, newCategory, adminAuth);
+        await POST(`/odata/v4/admin/Categories(ID=${createResponse.data.ID},IsActiveEntity=false)/draftActivate`, {}, adminAuth);
         
         const categoryId = createResponse.data.ID;
 
         // Delete the category
-        const deleteResponse = await DELETE(`/odata/v4/admin/Categories(${categoryId})`, adminAuth);
+        const deleteResponse = await DELETE(`/odata/v4/admin/Categories(ID=${categoryId},IsActiveEntity=true)`, adminAuth);
         expect(deleteResponse.status).toBe(204);
 
         // Verify category is deleted
         try {
-          await GET(`/odata/v4/admin/Categories(${categoryId})`, adminAuth);
-          fail('Expected category to be deleted (404)');
+          await GET(`/odata/v4/admin/Categories(ID=${categoryId},IsActiveEntity=true)`, adminAuth);
+          throw new Error('Expected category to be deleted (404)');
         } catch (error) {
           expect(error.response.status).toBe(404);
         }
@@ -625,7 +642,7 @@ describe('AdminService', () => {
 
         try {
           await POST('/odata/v4/admin/DiscountCodes', invalidDiscount, adminAuth);
-          fail('Expected request to fail');
+          throw new Error('Expected request to fail');
         } catch (error) {
           expect(error.response.status).toBe(400);
         }
@@ -642,7 +659,7 @@ describe('AdminService', () => {
 
         try {
           await POST('/odata/v4/admin/DiscountCodes', invalidDiscount, adminAuth);
-          fail('Expected request to fail');
+          throw new Error('Expected request to fail');
         } catch (error) {
           expect(error.response.status).toBe(400);
         }
@@ -660,7 +677,7 @@ describe('AdminService', () => {
 
         try {
           await POST('/odata/v4/admin/DiscountCodes', invalidDiscount, adminAuth);
-          fail('Expected request to fail');
+          throw new Error('Expected request to fail');
         } catch (error) {
           expect(error.response.status).toBe(400);
         }
@@ -692,7 +709,7 @@ describe('AdminService', () => {
         // Second one should fail
         try {
           await POST('/odata/v4/admin/DiscountCodes', discount2, adminAuth);
-          fail('Expected request to fail due to duplicate code');
+          throw new Error('Expected request to fail due to duplicate code');
         } catch (error) {
           expect(error.response.status).toBe(400);
         }
@@ -736,7 +753,7 @@ describe('AdminService', () => {
         
         try {
           await GET(`/odata/v4/admin/DiscountCodes(${nonExistentId})`, adminAuth);
-          fail('Expected request to fail with 404');
+          throw new Error('Expected request to fail with 404');
         } catch (error) {
           expect(error.response.status).toBe(404);
         }
@@ -826,7 +843,7 @@ describe('AdminService', () => {
         // Verify discount code is deleted
         try {
           await GET(`/odata/v4/admin/DiscountCodes(${discountId})`, adminAuth);
-          fail('Expected discount code to be deleted (404)');
+          throw new Error('Expected discount code to be deleted (404)');
         } catch (error) {
           expect(error.response.status).toBe(404);
         }
@@ -837,7 +854,7 @@ describe('AdminService', () => {
         
         try {
           await DELETE(`/odata/v4/admin/DiscountCodes(${nonExistentId})`, adminAuth);
-          fail('Expected request to fail with 404');
+          throw new Error('Expected request to fail with 404');
         } catch (error) {
           expect(error.response.status).toBe(404);
         }
@@ -906,7 +923,7 @@ describe('AdminService', () => {
 
         try {
           await POST(`/odata/v4/admin/activateDiscount`, { discountId: nonExistentId }, adminAuth);
-          fail('Expected request to fail');
+          throw new Error('Expected request to fail');
         } catch (error) {
           expect(error.response.status).toBe(404);
         }
@@ -917,7 +934,7 @@ describe('AdminService', () => {
 
         try {
           await POST(`/odata/v4/admin/deactivateDiscount`, { discountId: nonExistentId }, adminAuth);
-          fail('Expected request to fail');
+          throw new Error('Expected request to fail');
         } catch (error) {
           expect(error.response.status).toBe(404);
         }

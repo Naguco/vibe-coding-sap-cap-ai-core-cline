@@ -20,7 +20,8 @@
   },
   "scripts": {
     "start": "cds-serve",
-    "test": "jest --silent",
+    "test": "jest",
+    "test:silent": "jest --silent",
     "test:watch": "jest --watch",
     "watch-bookstore-app-ai-ui": "cds watch --open bookstoreappaiui/index.html?sap-ui-xx-viewCache=false --livereload false",
     "watch-customer-shopping-ui": "cds watch --open customershoppingui/index.html?sap-ui-xx-viewCache=false --livereload false",
@@ -66,6 +67,9 @@
           "destination": "BUSINESS_PARTNER_API"
         }
       }
+    },
+    "fiori": {
+      "bypass_draft": "true"
     }
   },
   "workspaces": [
