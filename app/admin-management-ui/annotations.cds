@@ -1,4 +1,6 @@
 using AdminService as service from '../../srv/admin-service';
+using from '../../db/data-model';
+
 
 // Enable CRUD operations for Books entity
 annotate service.Books with @(
@@ -83,6 +85,12 @@ annotate service.Books with @(
             ID : 'InventoryFacet',
             Label : 'Inventory & Pricing',
             Target : '@UI.FieldGroup#InventoryInfo',
+        },
+        {
+            $Type : 'UI.ReferenceFacet',
+            Label : 'Suppliers',
+            ID : 'Suppliers',
+            Target : 'suppliers/@UI.LineItem#Suppliers',
         },
     ],
     UI.FieldGroup #BasicInfo : {
@@ -428,3 +436,46 @@ annotate service.Authors.books with @(
         },
     ],
 );
+
+annotate service.BookSuppliers with @(
+    UI.LineItem #Suppliers : [
+        {
+            $Type : 'UI.DataField',
+            Value : supplier.ID,
+            Label : 'ID',
+        },
+        {
+            $Type : 'UI.DataField',
+            Value : supplier.name,
+            Label : 'name',
+        },
+    ]
+);
+
+annotate service.BookSuppliers with {
+    supplier @(
+        title : 'Supplier',
+        Common.Label : 'Supplier',
+        Common.Text : supplier.name,
+        Common.TextArrangement : #TextOnly,
+        Common.ValueList : {
+            $Type : 'Common.ValueListType',
+            CollectionPath : 'S4HANA_BusinessPartner',
+            Parameters : [
+                {
+                    $Type : 'Common.ValueListParameterInOut',
+                    LocalDataProperty : supplier_ID,
+                    ValueListProperty : 'ID',
+                },
+                {
+                    $Type : 'Common.ValueListParameterDisplayOnly',
+                    ValueListProperty : 'name',
+                },
+                {
+                    $Type : 'Common.ValueListParameterDisplayOnly',
+                    ValueListProperty : 'category',
+                }
+            ],
+        }
+    )
+};

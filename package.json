@@ -25,7 +25,8 @@
     "test:watch": "jest --watch",
     "watch-bookstore-app-ai-ui": "cds watch --open bookstoreappaiui/index.html?sap-ui-xx-viewCache=false --livereload false",
     "watch-customer-shopping-ui": "cds watch --open customershoppingui/index.html?sap-ui-xx-viewCache=false --livereload false",
-    "watch-admin-management-ui": "cds watch --open bookstore.admin.adminmanagementui/index.html?sap-ui-xx-viewCache=false --livereload false"
+    "watch-admin-management-ui": "cds watch --open bookstore.admin.adminmanagementui/index.html?sap-ui-xx-viewCache=false --livereload false",
+    "watch:hybrid": "cds watch --profile hybrid"
   },
   "jest": {
     "testEnvironment": "node",

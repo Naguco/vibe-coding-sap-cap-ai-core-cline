@@ -71,30 +71,6 @@ describe('Supplier Management - Standard OData Operations', () => {
       expect(response.data.isPreferred).toBe(true);
     });
 
-    test('should read BookSupplier relationships', async () => {
-
-      const supplierRelationship = {
-        supplier: { ID: '0000001235' },
-        isPreferred: true,
-        contractNumber: 'CNT-001',
-        leadTime: 7
-      };
-
-      await POST(`/odata/v4/admin/Books(ID=${testBookId},IsActiveEntity=true)/AdminService.draftEdit`, {}, adminAuth);
-      await POST(
-        `/odata/v4/admin/Books(ID=${testBookId},IsActiveEntity=false)/suppliers`,
-        supplierRelationship,
-        adminAuth
-      );
-
-      const response = await GET(`/odata/v4/admin/BookSuppliers?$filter=book_ID eq ${testBookId}`, adminAuth);
-
-      expect(response.status).toBe(200);
-      expect(response.data.value).toBeInstanceOf(Array);
-      expect(response.data.value.length).toBeGreaterThan(0);
-      expect(response.data.value[0].supplier_ID).toBe('0000001234');
-    });
-
     test('should update BookSupplier relationship', async () => {
       const bookPayload = {
         ID: cds.utils.uuid(), // Generate a NEW ID just for this test

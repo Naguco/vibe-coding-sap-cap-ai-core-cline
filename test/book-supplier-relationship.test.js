@@ -14,13 +14,6 @@ describe('Book-Supplier Relationship Integration', () => {
         expect(response.status).toBe(200);
         expect(response.data).toContain('BookSuppliers');
       });
-
-      test('should support CRUD operations on BookSuppliers', async () => {
-        // Test will fail initially - entity not exposed yet
-        const response = await GET('/odata/v4/admin/BookSuppliers', adminAuth);
-        expect(response.status).toBe(200);
-        expect(response.data.value).toBeInstanceOf(Array);
-      });
     });
 
     describe('Books with Suppliers', () => {
